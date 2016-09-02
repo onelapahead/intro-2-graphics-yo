@@ -70,6 +70,18 @@ function loadSpheres() {
 
     function complete(evt) {
         var inputSpheres = JSON.parse(req.response);
+        var sphere = null;
+        for (var i = 0; i < inputSpheres.length; i++) {
+          sphere = inputSpheres[i];
+          var center = new Vector(sphere.x, sphere.y, sphere.z);
+          sphere.center = center;
+          delete sphere.x;
+          delete sphere.y;
+          delete sphere.z;
+          sphere.ambient = new Vector(sphere.ambient[0], sphere.ambient[1], sphere.ambient[2]);
+          sphere.diffuse = new Vector(sphere.diffuse[0], sphere.diffuse[1], sphere.diffuse[2]);
+          sphere.specular = new Vector(sphere.specular[0], sphere.specular[1], sphere.specular[2]);
+        }
         run(inputSpheres);
     }
 
