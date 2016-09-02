@@ -100,34 +100,3 @@ function log(str) {
   var cons = document.getElementById("console");
   cons.innerHTML += str.toString();
 }
-
-// draw 2d projections read from the JSON file at class github
-function drawInputSpheresUsingArcs(inputSpheres, context) {
-
-    if (inputSpheres != String.null) { 
-        var c = new Color(0,0,0,0); // the color at the pixel: black
-        var w = context.canvas.width;
-        var h = context.canvas.height;
-        var n = inputSpheres.length; 
-        //console.log("number of spheres: " + n);
-
-        // Loop over the spheres, draw each in 2d
-        for (var s=0; s<n; s++) {
-            context.fillStyle = 
-                "rgb(" + Math.floor(inputSpheres[s].diffuse[0]*255)
-                +","+ Math.floor(inputSpheres[s].diffuse[1]*255)
-                +","+ Math.floor(inputSpheres[s].diffuse[2]*255) +")"; // rand color
-            context.beginPath();
-            context.arc(
-                Math.round(w*inputSpheres[s].x),
-                Math.round(h*inputSpheres[s].y),
-                Math.round(w*inputSpheres[s].r),
-                0,2*Math.PI);
-            context.fill();
-            //console.log(context.fillStyle);
-            //console.log("x: "+Math.round(w*inputSpheres[s].x));
-            //console.log("y: "+Math.round(h*inputSpheres[s].y));
-            //console.log("r: "+Math.round(w*inputSpheres[s].r));
-        } // end for spheres
-    } // end if spheres found
-} // end draw input spheres

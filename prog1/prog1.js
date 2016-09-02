@@ -1,10 +1,17 @@
 function drawSpheres(inputSpheres, context) {
+    var w = context.canvas.width,
+        h = context.canvas.height,
+        imgData = context.createImageData(w,h),
+        ratio = w / h,
+        size = 1;
+
     var eye = new Vector(0.5, 0.5, -0.5);
     var lookat = new Vector(0, 0, 1);
     var lookup = new Vector(0, 1, 0);
 
-    var windowDistance = 1.0;
-    var windowDimensions = new Vector(1, 1, 0);
+    var windowDistance = 0.5;
+
+    var windowDimensions = new Vector(ratio * size, size, 0);
     var windowCenter = eye.add(lookat.mult(windowDistance));
     var half = windowDimensions.div(2.0);
     var wLL = windowCenter.sub(half);
@@ -17,20 +24,19 @@ function drawSpheres(inputSpheres, context) {
     console.log(wLR);
     delete half;
 
-    var lightSource = new Vector(2,4,-0.5);
-    var lightColor = new Vector(1,1,1);
-
-    var w = context.canvas.width,
-        h = context.canvas.height,
-        imgData = context.createImageData(w,h);
+    var light = {
+        'position': new Vector(2,4,-0.5),
+        'ambient': new Vector(1,1,1),
+        'diffuse': new Vector(1,1,1),
+        'specular': new Vector(1,1,1),
+    }
 
     var pixels3D = [];
 
-    log("iterating over all pixels...");
     var dt = 1 / (h - 1);
     var ds = 1 / (w - 1);
-    var lerpLeft = new Lerp(wLL, wUL);
-    var lerpRight = new Lerp(wLR, wUR);
+    var lerpLeft = new Lerp(wUL, wLL);
+    var lerpRight = new Lerp(wUR, wLR);
     var j = 0;
     for (var t = 0; t < 1.0; t += dt) {
         var i = 0;
@@ -41,10 +47,7 @@ function drawSpheres(inputSpheres, context) {
             // console.log(pixels3D[j][i]);
             var params = {
                 'eye': eye,
-                'light': {
-                    'position': lightSource,
-                    'color': lightColor,
-                },
+                'light': light,
                 'pixel': {
                     'view': { 'i': i, 'j': j },
                     'position': pixels3D[j][i],
@@ -57,9 +60,7 @@ function drawSpheres(inputSpheres, context) {
         }
         j++;
     }
-
-    log("Almost done!");
-
+    log(pixels3D[0][0]);
     context.putImageData(imgData, 0, 0);
 }
 
@@ -69,10 +70,6 @@ function run(inputSpheres) {
     var canvas = document.getElementById("viewport"); 
     var context = canvas.getContext("2d");
 
-
-    // drawInputSpheresUsingArcs(inputSpheres, context);
-    // shows how to read input file, but not how to draw pixels
-
     // TESTS
     // Vector.basicTest();
 
@@ -80,6 +77,6 @@ function run(inputSpheres) {
 }
 
 function main() {
-    // Anything else we want to do....
+    // Anything else we want to do before....
     loadSpheres();
 }

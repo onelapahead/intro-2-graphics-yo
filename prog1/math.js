@@ -10,7 +10,7 @@ class Vector {
         } // end try
         catch (e) {
             console.log(e);
-        }   
+        }
     }
 
     add(v) {
@@ -22,6 +22,9 @@ class Vector {
     }
 
     mult(c) {
+        if (c instanceof Vector) {
+          return new Vector(this.x*c.x, this.y*c.y, this.z*c.z);
+        }
         return new Vector(this.x*c, this.y*c, this.z*c);
     }
 

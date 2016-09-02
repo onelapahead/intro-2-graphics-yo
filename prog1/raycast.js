@@ -27,7 +27,7 @@ function castRayAndDraw(params) {
     } else {
       t = -b / (2 * a);
     }
-    if (t < intersection.t) {
+    if (t < intersection.t && t > 0) {
       intersection.t = t;
       intersection.i = i;
     }
@@ -45,7 +45,7 @@ function castRayAndDraw(params) {
 function blinnPhongShader(sphere, ray, t, light) {
   var point = ray.interpolate(t);
   var normal = point.sub(sphere.center);
-  var l = point.sub(light.position);
+  var l = light.position.sub(point);
   var v = ray.a.sub(point);
   var h = l.add(v)
   l = l.unit();
@@ -57,6 +57,11 @@ function blinnPhongShader(sphere, ray, t, light) {
   if (nh < 0) nh = 0;
   if (nl < 0) nl = 0;
 
-  var coeff = sphere.ambient.add(sphere.diffuse.mult(nl)).add(sphere.specular.mult(nh));
-  return new Color(255*light.color.x*coeff.x, 255*light.color.y*coeff.y, 255*light.color.z*coeff.z, 255);
+  var ambient = sphere.ambient.mult(light.ambient);
+  var diffuse = sphere.diffuse.mult(nl).mult(light.diffuse);
+  var specular = sphere.specular.mult(nh).mult(light.specular);
+
+  var coeff = ambient.add(diffuse).add(specular);
+  delete ambient, diffuse, specular;
+  return new Color(255*coeff.x, 255*coeff.y, 255*coeff.z, 255);
 }
