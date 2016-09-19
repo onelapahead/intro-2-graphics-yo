@@ -2,7 +2,7 @@ class Vector {
     // TODO sanitation checks
     constructor(x,y,z) {
         try {
-            if (((typeof(x)).toLowerCase() !== "number") || ((typeof(y)).toLowerCase() !== "number") || ((typeof(z)).toLowerCase() !== "number")) {
+            if (((typeof(x)) !== "number") || ((typeof(y)) !== "number") || ((typeof(z)) !== "number")) {
                 console.log(x + " " + y + " " + z);
                 throw "vector component not a number";
             } else

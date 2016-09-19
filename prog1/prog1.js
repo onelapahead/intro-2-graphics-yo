@@ -29,7 +29,7 @@ function drawSpheres(inputSpheres, context) {
         'ambient': new Vector(1,1,1),
         'diffuse': new Vector(1,1,1),
         'specular': new Vector(1,1,1),
-    }
+    };
 
     var pixels3D = [];
 
