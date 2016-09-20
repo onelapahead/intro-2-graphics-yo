@@ -81,7 +81,7 @@ function loadSpheres() {
           sphere.ambient = new Vector(sphere.ambient[0], sphere.ambient[1], sphere.ambient[2]);
           sphere.diffuse = new Vector(sphere.diffuse[0], sphere.diffuse[1], sphere.diffuse[2]);
           sphere.specular = new Vector(sphere.specular[0], sphere.specular[1], sphere.specular[2]);
-          sphere.n = 10;
+          sphere.n = 5;
         }
         run(inputSpheres);
     }

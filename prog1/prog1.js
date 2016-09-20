@@ -5,19 +5,26 @@ function drawSpheres(inputSpheres, context) {
         ratio = w / h,
         size = 1;
 
-    var eye = new Vector(0.5, 0.5, -0.5);
-    var lookat = new Vector(0, 0, 1);
+    var eye = new Vector(1.5, 0.5, 0.5);
+    var lookat = new Vector(-1, 0, 0);
     var lookup = new Vector(0, 1, 0);
+
+    var horizontal = lookup.cross(lookat);
 
     var windowDistance = 0.5;
 
-    var windowDimensions = new Vector(ratio * size, size, 0);
+    var up = lookup.mult(size);
+    var right = horizontal.mult(ratio * size);
+    console.log(right);
+
+    var halfRight = up.add(right).div(2);
+    var halfLeft = up.sub(right).div(2);
+
     var windowCenter = eye.add(lookat.mult(windowDistance));
-    var half = windowDimensions.div(2.0);
-    var wLL = windowCenter.sub(half);
-    var wLR = windowCenter.sub(new Vector(-half.x, half.y, 0));
-    var wUR = windowCenter.add(half);
-    var wUL = windowCenter.add(new Vector(-half.x, half.y, 0));
+    var wLL = windowCenter.sub(halfRight);
+    var wLR = windowCenter.sub(halfLeft);
+    var wUR = windowCenter.add(halfRight);
+    var wUL = windowCenter.add(halfLeft);
     console.log(wUL);
     console.log(wUR);
     console.log(wLL);
@@ -61,6 +68,7 @@ function drawSpheres(inputSpheres, context) {
         j++;
     }
     log(pixels3D[0][0]);
+    log(pixels3D[pixels3D.length - 1][pixels3D[pixels3D.length - 1].length - 1]);
     context.putImageData(imgData, 0, 0);
 }
 

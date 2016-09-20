@@ -57,7 +57,9 @@ function blinnPhongShader(sphere, ray, t, light) {
   var nh = normal.dot(h);
   if (nh < 0) nh = 0;
   if (nl < 0) nl = 0;
-  nh = Math.pow(nh, sphere.n);
+  // n' = 4n, n' is for Blinn-Phong, n is for Phong
+  // src: https://en.wikipedia.org/wiki/Blinn–Phong_shading_model
+  nh = Math.pow(nh, 4 * sphere.n);
 
   var ambient = sphere.ambient.mult(light.ambient);
   var diffuse = sphere.diffuse.mult(nl).mult(light.diffuse);
