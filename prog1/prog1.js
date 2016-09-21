@@ -32,6 +32,7 @@ function drawSpheres(inputLights, inputSpheres, context) {
     delete half;
 
     var pixels3D = [];
+    var rayCaster = new RayCaster(inputLights, inputSpheres, imgData);
 
     var dt = 1 / (h - 1);
     var ds = 1 / (w - 1);
@@ -45,17 +46,10 @@ function drawSpheres(inputLights, inputSpheres, context) {
         for (var s = 0; s <= 1.0; s += ds) {
             pixels3D[j][i] = lerpAcross.interpolate(s);
             // console.log(pixels3D[j][i]);
-            var params = {
-                'eye': eye,
-                'lights': inputLights,
-                'pixel': {
-                    'view': { 'i': i, 'j': j },
-                    'position': pixels3D[j][i],
-                },
-                'spheres': inputSpheres,
-                'imgData': imgData,
-            };
-            castRayAndDraw(params);
+            rayCaster.castRayAndDraw(eye, {
+                'view': { 'i': i, 'j': j },
+                'position': pixels3D[j][i],
+            });
             i++;
         }
         j++;
@@ -77,6 +71,8 @@ function run(inputLights, inputSpheres, inputTriangles) {
     drawSpheres(inputLights, inputSpheres, context);
 }
 
+
+// helpful notes: http://www.cs.cornell.edu/courses/cs4620/2011fa/lectures/08raytracingWeb.pdf
 function main() {
     const INPUT_TRIANGLES_URL =
         "https://ncsucgclass.github.io/prog1/triangles.json";
@@ -102,7 +98,7 @@ function main() {
               sphere.specular = new Vector(sphere.specular[0], sphere.specular[1], sphere.specular[2]);
             }
             console.log("loaded spheres...");
-            return loadResource("http://pastebin.com/raw/r1YD90n9");
+            return loadResource("http://pastebin.com/raw/u69sdEiS   ");
         }).then(function (data) { // load the lights
             lights = JSON.parse(data);
             for (var i = 0; i < lights.length; i++) {
