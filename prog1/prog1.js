@@ -1,12 +1,12 @@
-function drawSpheres(inputSpheres, context) {
+function drawSpheres(inputLights, inputSpheres, context) {
     var w = context.canvas.width,
         h = context.canvas.height,
         imgData = context.createImageData(w,h),
         ratio = w / h,
         size = 1;
 
-    var eye = new Vector(1.5, 0.5, 0.5);
-    var lookat = new Vector(-1, 0, 0);
+    var eye = new Vector(0.5, 0.5, -0.5);
+    var lookat = new Vector(0, 0, 1);
     var lookup = new Vector(0, 1, 0);
 
     var horizontal = lookup.cross(lookat);
@@ -31,13 +31,6 @@ function drawSpheres(inputSpheres, context) {
     console.log(wLR);
     delete half;
 
-    var light = {
-        'position': new Vector(2,4,-0.5),
-        'ambient': new Vector(1,1,1),
-        'diffuse': new Vector(1,1,1),
-        'specular': new Vector(1,1,1),
-    };
-
     var pixels3D = [];
 
     var dt = 1 / (h - 1);
@@ -54,7 +47,7 @@ function drawSpheres(inputSpheres, context) {
             // console.log(pixels3D[j][i]);
             var params = {
                 'eye': eye,
-                'light': light,
+                'lights': inputLights,
                 'pixel': {
                     'view': { 'i': i, 'j': j },
                     'position': pixels3D[j][i],
@@ -73,7 +66,7 @@ function drawSpheres(inputSpheres, context) {
 }
 
 /* run -- here is where execution begins after window load */
-function run(inputSpheres) {
+function run(inputLights, inputSpheres, inputTriangles) {
     // Get the canvas and context
     var canvas = document.getElementById("viewport"); 
     var context = canvas.getContext("2d");
@@ -81,10 +74,47 @@ function run(inputSpheres) {
     // TESTS
     // Vector.basicTest();
 
-    drawSpheres(inputSpheres, context);
+    drawSpheres(inputLights, inputSpheres, context);
 }
 
 function main() {
-    // Anything else we want to do before....
-    loadSpheres();
+    const INPUT_TRIANGLES_URL =
+        "https://ncsucgclass.github.io/prog1/triangles.json";
+    const INPUT_LIGHTS_URL =
+        "https://ncsucgclass.github.io/prog1/lights.json";
+    const INPUT_SPHERES_URL =
+            "https://ncsucgclass.github.io/prog1/spheres.json";
+
+    var spheres, lights, triangles;
+    loadResource(INPUT_SPHERES_URL) // load the spheres
+        .then(function (data) {
+            spheres = JSON.parse(data);
+            var sphere = null;
+            for (var i = 0; i < spheres.length; i++) {
+              sphere = spheres[i];
+              var center = new Vector(sphere.x, sphere.y, sphere.z);
+              sphere.center = center;
+              delete sphere.x;
+              delete sphere.y;
+              delete sphere.z;
+              sphere.ambient = new Vector(sphere.ambient[0], sphere.ambient[1], sphere.ambient[2]);
+              sphere.diffuse = new Vector(sphere.diffuse[0], sphere.diffuse[1], sphere.diffuse[2]);
+              sphere.specular = new Vector(sphere.specular[0], sphere.specular[1], sphere.specular[2]);
+            }
+            console.log("loaded spheres...");
+            return loadResource("http://pastebin.com/raw/r1YD90n9");
+        }).then(function (data) { // load the lights
+            lights = JSON.parse(data);
+            for (var i = 0; i < lights.length; i++) {
+                lights[i] = new Light(lights[i]);
+            }
+            console.log("loaded lights...");
+            return loadResource(INPUT_TRIANGLES_URL);
+        }).then(function(data) { // load the triangles and start rendering
+            // triangles = JSON.parse(data); // TODO
+            console.log("loaded triangles...");
+            run(lights, spheres, triangles);
+        }).catch(function(err) {
+            console.error("Failed to load all the resources: ", err.status);
+        });
 }

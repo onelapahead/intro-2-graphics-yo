@@ -35,37 +35,48 @@ function castRayAndDraw(params) {
 
   if (typeof(intersection.i) !== 'undefined') {
     var sphere = params.spheres[intersection.i];
-    var c = blinnPhongShader(sphere, ray, intersection.t, params.light);
+    var c = blinnPhongShader(sphere, ray, intersection.t, params.lights);
     drawPixel(params.imgData, params.pixel.view.i, params.pixel.view.j, c);
   } else {
     drawPixel(params.imgData, params.pixel.view.i, params.pixel.view.j, new Color(0,0,0,255));
   }
 }
 
-function blinnPhongShader(sphere, ray, t, light) {
+function blinnPhongShader(sphere, ray, t, lights) {
   var point = ray.interpolate(t);
   var normal = point.sub(sphere.center);
-  var l = light.position.sub(point);
-  var v = ray.a.sub(point);
-  l = l.unit();
-  v = v.unit();
-  var h = l.add(v);
-  h = h.unit();
-  normal = normal.unit();
 
-  var nl = normal.dot(l);
-  var nh = normal.dot(h);
-  if (nh < 0) nh = 0;
-  if (nl < 0) nl = 0;
-  // n' = 4n, n' is for Blinn-Phong, n is for Phong
-  // src: https://en.wikipedia.org/wiki/Blinn–Phong_shading_model
-  nh = Math.pow(nh, 4 * sphere.n);
+  var ambient = new Vector(0, 0, 0);
+  var diffuse = new Vector(0, 0, 0);
+  var specular = new Vector(0, 0, 0);
 
-  var ambient = sphere.ambient.mult(light.ambient);
-  var diffuse = sphere.diffuse.mult(nl).mult(light.diffuse);
-  var specular = sphere.specular.mult(nh).mult(light.specular);
+  for (var i = 0; i < lights.length; i++) {
 
-  var coeff = ambient.add(diffuse).add(specular);
+    var l = lights[i].position.sub(point);
+    var v = ray.a.sub(point);
+    l = l.unit();
+    v = v.unit();
+    var h = l.add(v);
+    h = h.unit();
+    normal = normal.unit();
+
+    var nl = normal.dot(l);
+    var nh = normal.dot(h);
+    if (nh < 0) nh = 0;
+    if (nl < 0) nl = 0;
+    // n' = 4n, n' is for Blinn-Phong, n is for Phong
+    // src: https://en.wikipedia.org/wiki/Blinn–Phong_shading_model
+    nh = Math.pow(nh, 4 * sphere.n);
+
+    ambient = ambient.add(lights[i].ambient);
+    diffuse = diffuse.add(lights[i].diffuse.mult(nl));
+    specular = specular.add(lights[i].specular.mult(nh));
+  }
+
+  var coeff = ambient.mult(sphere.ambient).add(diffuse.mult(sphere.diffuse)).add(specular.mult(sphere.specular));
+  if (coeff.x > 1.0) coeff.x = 1.0;
+  if (coeff.y > 1.0) coeff.y = 1.0;
+  if (coeff.z > 1.0) coeff.z = 1.0;
   delete ambient, diffuse, specular;
   return new Color(255*coeff.x, 255*coeff.y, 255*coeff.z, 255);
 }

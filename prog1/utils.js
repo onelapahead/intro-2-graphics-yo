@@ -39,6 +39,16 @@ class Color {
     } // end Color change method
 } // end color class
 
+
+class Light {
+    constructor(params) {
+        this.position = new Vector(params.x, params.y, params.z);
+        this.ambient = new Vector(params.ambient[0], params.ambient[1], params.ambient[2]);
+        this.diffuse = new Vector(params.diffuse[0], params.diffuse[1], params.diffuse[2]);
+        this.specular = new Vector(params.specular[0], params.specular[1], params.specular[2]);
+    }
+}
+
 /* utility functions */
 
 // draw a pixel at x,y using color
@@ -63,38 +73,32 @@ function drawPixel(imagedata,x,y,color) {
     }
 } // end drawPixel
 
-function loadSpheres() {
-    var req = new XMLHttpRequest();
-    const INPUT_SPHERES_URL = 
-        "https://ncsucgclass.github.io/prog1/spheres.json";
+// helpful source for promisifying http request:
+// http://stackoverflow.com/questions/30008114/how-do-i-promisify-native-xhr
+function loadResource(url) {
+    return new Promise(function(resolve, reject) {
+        var req = new XMLHttpRequest();
+        req.open('GET', url);
 
-    function complete(evt) {
-        var inputSpheres = JSON.parse(req.response);
-        var sphere = null;
-        for (var i = 0; i < inputSpheres.length; i++) {
-          sphere = inputSpheres[i];
-          var center = new Vector(sphere.x, sphere.y, sphere.z);
-          sphere.center = center;
-          delete sphere.x;
-          delete sphere.y;
-          delete sphere.z;
-          sphere.ambient = new Vector(sphere.ambient[0], sphere.ambient[1], sphere.ambient[2]);
-          sphere.diffuse = new Vector(sphere.diffuse[0], sphere.diffuse[1], sphere.diffuse[2]);
-          sphere.specular = new Vector(sphere.specular[0], sphere.specular[1], sphere.specular[2]);
-          sphere.n = 5;
-        }
-        run(inputSpheres);
-    }
+        req.onload = function () {
+            if (this.status == 200 && this.status < 300) {
+                resolve(req.response);
+            } else {
+                reject({
+                    status: req.status,
+                    statusText: req.statusText
+                });
+            }
+        };
 
-    function failed(evt) {
-        console.log('shit failed yo...');
-    }
-
-    req.addEventListener('load', complete);
-    req.addEventListener('error', failed);
-
-    req.open('GET', INPUT_SPHERES_URL);
-    req.send();
+        req.onerror = function() {
+            reject({
+                status: req.status,
+                statusText: req.statusText
+            });
+        };
+        req.send();
+    });
 }
 
 function log(str) {
