@@ -5,9 +5,11 @@ function drawSpheres(inputLights, inputSpheres, context) {
         ratio = w / h,
         size = 1;
 
-    var eye = new Vector(0.5, 0.5, -0.5);
-    var lookat = new Vector(0, 0, 1);
+    var eye = new Vector(-0.5, 0.5, 1.5);
+    var lookat = new Vector(1, 0, -1);
+    lookat = lookat.unit();
     var lookup = new Vector(0, 1, 0);
+    lookup = lookup.unit();
 
     var horizontal = lookup.cross(lookat);
 
