@@ -1,4 +1,8 @@
 const EPSILON = 0.00001;
+const BIAS = 0.01;
+
+// TODO add bias to prevent self-intersection in shadow ray
+// src: http://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/ligth-and-shadows
 
 class RayCaster {
   constructor(lights, spheres, imgData) {
@@ -55,6 +59,7 @@ class RayCaster {
   blinnPhongShader(sphere, ray, t) {
     var point = ray.interpolate(t);
     var normal = point.sub(sphere.center);
+    normal = normal.unit();
 
     var ambient = new Vector(0, 0, 0);
     var diffuse = new Vector(0, 0, 0);
@@ -64,7 +69,7 @@ class RayCaster {
 
       ambient = ambient.add(this.lights[i].ambient);
 
-      var shadowRay = new Lerp(point, this.lights[i].position);
+      var shadowRay = new Lerp(point.add(normal.mult(BIAS)), this.lights[i].position);
       var intersection = this.castRay(shadowRay);
 
       if (typeof(intersection.i) === 'undefined') {
@@ -74,7 +79,6 @@ class RayCaster {
         v = v.unit();
         var h = l.add(v);
         h = h.unit();
-        normal = normal.unit();
 
         var nl = normal.dot(l);
         var nh = normal.dot(h);

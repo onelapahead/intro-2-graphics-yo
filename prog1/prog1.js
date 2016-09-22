@@ -5,8 +5,8 @@ function drawSpheres(inputLights, inputSpheres, context) {
         ratio = w / h,
         size = 1;
 
-    var eye = new Vector(-0.5, 0.5, 1.5);
-    var lookat = new Vector(1, 0, -1);
+    var eye = new Vector(1.5, 0.5, 1.5);
+    var lookat = new Vector(-1, 0, -1);
     lookat = lookat.unit();
     var lookup = new Vector(0, 1, 0);
     lookup = lookup.unit();
@@ -100,7 +100,7 @@ function main() {
               sphere.specular = new Vector(sphere.specular[0], sphere.specular[1], sphere.specular[2]);
             }
             console.log("loaded spheres...");
-            return loadResource("http://pastebin.com/raw/u69sdEiS   ");
+            return loadResource("http://pastebin.com/raw/u69sdEiS");
         }).then(function (data) { // load the lights
             lights = JSON.parse(data);
             for (var i = 0; i < lights.length; i++) {
