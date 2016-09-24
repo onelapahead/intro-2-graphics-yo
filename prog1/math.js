@@ -3,7 +3,7 @@ class Vector {
     constructor(x,y,z) {
         try {
             if (((typeof(x)) !== "number") || ((typeof(y)) !== "number") || ((typeof(z)) !== "number")) {
-                console.log(x + " " + y + " " + z);
+                console.log(typeof(x));
                 throw "vector component not a number";
             } else
                 this.x = x; this.y = y; this.z = z; 

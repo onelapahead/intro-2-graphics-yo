@@ -100,8 +100,3 @@ function loadResource(url) {
         req.send();
     });
 }
-
-function log(str) {
-  var cons = document.getElementById("console");
-  cons.innerHTML += str.toString();
-}

@@ -5,15 +5,55 @@
   </head>
 
   <body onload="main();">
-    <canvas id="viewport" width="513" height="513"></canvas>
-    <br />
-    <br />
-    <div id="console">
-
+    <div>
+      <canvas id="viewport" width="513" height="513"></canvas>
     </div>
+
+    <br />
+    <br />
+    <form id="ui" onsubmit="return render()">
+      <div id="screen">
+        <div id="width">
+          Width: <input type="number" name="width" min="1">
+        </div>
+        <div id="height">
+          Height: <input type="number" name="height" min="1">
+        </div>
+      </div>
+
+      <br />
+      <div id="view">
+        <div id="eye">
+          Eye:
+          <div>
+            X: <input type="number" step="any" name="eye_x">
+            Y: <input type="number" step="any" name="eye_y">
+            Z: <input type="number" step="any" name="eye_z">
+          </div>
+        </div>
+
+        <div id="lookat">
+          Look At:
+          <div>
+            X: <input type="number" step="any" name="lookat_x">
+            Y: <input type="number" step="any" name="lookat_y">
+            Z: <input type="number" step="any" name="lookat_z">
+          </div
+        </div>
+
+        <div id="lookup">
+          Look Up:
+          <div>
+            X: <input type="number" step="any" name="lookup_x">
+            Y: <input type="number" step="any" name="lookup_y">
+            Z: <input type="number" step="any" name="lookup_z">
+          </div>
+        </div>
+      </div>
+
+      <br />
+      <input type="submit" name="submite" value="Render">
+    </form>
   </body>
-  <script type="text/javascript" src="utils.js"></script>
-  <script type="text/javascript" src="math.js"></script>
   <script type="text/javascript" src="raycast.js"></script>
-  <script type="text/javascript" src="prog1.js"></script>
 </html>

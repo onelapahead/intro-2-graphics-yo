@@ -1,14 +1,14 @@
-function drawSpheres(inputLights, inputSpheres, context) {
-    var w = context.canvas.width,
-        h = context.canvas.height,
-        imgData = context.createImageData(w,h),
-        ratio = w / h,
-        size = 1;
+var lights, spheres, context, w, h, imgData;
+var eye = new Vector(0.5, 0.5, -0.5), lookat = new Vector(0, 0, 1), lookup = new Vector(0, 1, 0);
 
-    var eye = new Vector(1.5, 0.5, 1.5);
-    var lookat = new Vector(-1, 0, -1);
+function draw() {
+    w = context.canvas.width;
+    h = context.canvas.height;
+    var ratio = w / h,
+        size = 1;
+    imgData = context.createImageData(w,h);
+    console.log(lookat.dot(lookup));
     lookat = lookat.unit();
-    var lookup = new Vector(0, 1, 0);
     lookup = lookup.unit();
 
     var horizontal = lookup.cross(lookat);
@@ -34,8 +34,7 @@ function drawSpheres(inputLights, inputSpheres, context) {
     delete half;
 
     var pixels3D = [];
-    var rayCaster = new RayCaster(inputLights, inputSpheres, imgData);
-
+    var rayCaster = new RayCaster(lights, spheres, imgData);
     var dt = 1 / (h - 1);
     var ds = 1 / (w - 1);
     var lerpLeft = new Lerp(wUL, wLL);
@@ -56,21 +55,10 @@ function drawSpheres(inputLights, inputSpheres, context) {
         }
         j++;
     }
-    log(pixels3D[0][0]);
-    log(pixels3D[pixels3D.length - 1][pixels3D[pixels3D.length - 1].length - 1]);
+    console.log(pixels3D[0][0]);
+    console.log(pixels3D[pixels3D.length - 1][pixels3D[pixels3D.length - 1].length - 1]);
+
     context.putImageData(imgData, 0, 0);
-}
-
-/* run -- here is where execution begins after window load */
-function run(inputLights, inputSpheres, inputTriangles) {
-    // Get the canvas and context
-    var canvas = document.getElementById("viewport"); 
-    var context = canvas.getContext("2d");
-
-    // TESTS
-    // Vector.basicTest();
-
-    drawSpheres(inputLights, inputSpheres, context);
 }
 
 
@@ -83,7 +71,13 @@ function main() {
     const INPUT_SPHERES_URL =
             "https://ncsucgclass.github.io/prog1/spheres.json";
 
-    var spheres, lights, triangles;
+    // Get the canvas and context
+    var canvas = document.getElementById("viewport"); 
+    context = canvas.getContext("2d");
+
+    w = context.canvas.width;
+    h = context.canvas.height;
+
     loadResource(INPUT_SPHERES_URL) // load the spheres
         .then(function (data) {
             spheres = JSON.parse(data);
@@ -100,19 +94,51 @@ function main() {
               sphere.specular = new Vector(sphere.specular[0], sphere.specular[1], sphere.specular[2]);
             }
             console.log("loaded spheres...");
-            return loadResource("http://pastebin.com/raw/u69sdEiS");
+            return loadResource(INPUT_LIGHTS_URL);
         }).then(function (data) { // load the lights
             lights = JSON.parse(data);
             for (var i = 0; i < lights.length; i++) {
                 lights[i] = new Light(lights[i]);
             }
             console.log("loaded lights...");
-            return loadResource(INPUT_TRIANGLES_URL);
-        }).then(function(data) { // load the triangles and start rendering
-            // triangles = JSON.parse(data); // TODO
-            console.log("loaded triangles...");
-            run(lights, spheres, triangles);
+            draw();
         }).catch(function(err) {
-            console.error("Failed to load all the resources: ", err.status);
+            console.error("Failed to load all the resources: ", err);
         });
+}
+
+function render() {
+    context.clearRect(0,0,w,h);
+    try {
+        var form = document.getElementById('ui');
+        if (form.width.value == '') {
+            throw "Invalid width";
+        } else if (form.height.value == '') {
+            throw "Invalid height";
+        } else if (form.eye_x.value == '' || form.eye_y.value == '' || form.eye_z == '') {
+            throw "Invalid xyz coordinates for eye";
+        } else if (form.lookat_x.value == '' || form.lookat_y.value == '' || form.lookat_z == '') {
+            throw "Invalid xyz coordinates for eye";
+        } else if (form.lookup_x.value == '' || form.lookup_y.value == '' || form.lookup_z == '') {
+            throw "Invalid xyz coordinates for eye";
+        }
+
+        context.canvas.width = Number(form.width.value);
+        context.canvas.height = Number(form.height.value);
+        eye = new Vector(Number(form.eye_x.value), Number(form.eye_y.value), Number(form.eye_z.value));        
+        lookat = new Vector(Number(form.lookat_x.value), Number(form.lookat_y.value), Number(form.lookat_z.value));  
+        lookup = new Vector(Number(form.lookup_x.value), Number(form.lookup_y.value), Number(form.lookup_z.value));  
+
+        var check = lookat.dot(lookup);
+        if (check >= -EPSILON && check <= EPSILON) {
+            throw "Lookat vector is not normal to lookup";
+        }
+
+        draw();
+    } catch (err) {
+        alert(err);
+    }
+
+    return false;
+
 }
