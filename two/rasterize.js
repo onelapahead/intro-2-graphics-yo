@@ -11,14 +11,23 @@ var LookAt = new vec3.fromValues(0.0, 0.0, 1.0);
 var LookUp = new vec3.fromValues(0.0, 1.0, 0.0);
 var WindowDistance = 0.5;
 
+var Light = {
+    position: new vec3.fromValues(2, 4, -0.5),
+    ambient: new vec3.fromValues(1.0, 1.0, 1.0),
+    diffuse: new vec3.fromValues(1.0, 1.0, 1.0),
+    specular: new vec3.fromValues(1.0, 1.0, 1.0),
+};
+
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
 var vertexBuffer; // this contains vertex coordinates in triples
 var triangleBuffer; // this contains indices into vertexBuffer in triples
+var normalBuffer;
 var triBufferSize = 0; // the number of indices in the triangle buffer
 var vertexPositionAttrib; // where to put position for vertex shader
-var materialPosition, viewProjectionPosition;
+var vertexNormalAttrib;
+var materialPosition, viewProjectionPosition, viewLocation, normalLocation, lightPosition;
 
 // ASSIGNMENT HELPER FUNCTIONS
 
@@ -79,9 +88,11 @@ function loadTriangles(inputTriangles) {
         var whichSetVert; // index of vertex in current triangle set
         var whichSetTri; // index of triangle in current triangle set
         var coordArray = []; // 1D array of vertex coords for WebGL
+        var normArray = []; // 1D array of norm coords for WebGL
         var indexArray = []; // 1D array of vertex indices for WebGL
         var vtxBufferSize = 0; // the number of vertices in the vertex buffer
         var vtxToAdd = []; // vtx coords to add to the coord array
+        var normToAdd = null;
         var indexOffset = vec3.create(); // the index offset for the current set
         var triToAdd = vec3.create(); // tri indices to add to the index array
 
@@ -90,8 +101,10 @@ function loadTriangles(inputTriangles) {
 
             // set up the vertex coord array
             for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++) {
+                normToAdd = inputTriangles[whichSet].normals[whichSetVert];
                 vtxToAdd = inputTriangles[whichSet].vertices[whichSetVert];
                 coordArray.push(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]);
+                normArray.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]);
             } // end for vertices in set
             
             // set up the triangle index array, adjusting indices across sets
@@ -115,6 +128,10 @@ function loadTriangles(inputTriangles) {
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate that buffer
         gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(coordArray),gl.STATIC_DRAW); // coords to that buffer
 
+        normalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normArray), gl.STATIC_DRAW);
+
         // send the triangle indices to webGL
         triangleBuffer = gl.createBuffer(); // init empty triangle index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffer); // activate that buffer
@@ -134,7 +151,18 @@ function setupShaders() {
             vec3 specular;
         };
 
+        struct lightSource {
+            vec3 position;
+            vec3 ambient;
+            vec3 diffuse;
+            vec3 specular;
+        };
+
+        uniform lightSource light;
         uniform material matProperities;
+
+        varying vec4 V;
+        varying vec4 N;
 
         void main(void) {
             gl_FragColor = vec4(matProperities.diffuse, 1.0); // triangle's diffuse color only
@@ -145,10 +173,18 @@ function setupShaders() {
     var vShaderCode = `
 
         uniform mat4 viewProjection;
+        uniform mat4 view;
+        uniform mat4 normalMatrix;
+        attribute vec3 vertexNormal;
         attribute vec3 vertexPosition;
 
+        varying vec4 N;
+        varying vec4 V;
+
         void main(void) {
-            gl_Position = vec4(vertexPosition, 1.0); // use the untransformed position
+            gl_Position = vec4(vertexPosition, 1.0);
+            V = view * gl_Position;
+            N = normalMatrix * vec4(vertexNormal, 1.0);
             gl_Position = viewProjection * gl_Position;
         }
     `;
@@ -184,11 +220,22 @@ function setupShaders() {
                     gl.getAttribLocation(shaderProgram, "vertexPosition"); 
                 gl.enableVertexAttribArray(vertexPositionAttrib); // input to shader from array
 
+                vertexNormalAttrib = gl.getAttribLocation(shaderProgram, "vertexNormal");
+                gl.enableVertexAttribArray(vertexNormalAttrib);
+
                 materialPosition = {};
                 materialPosition.ambient = gl.getUniformLocation(shaderProgram, "matProperities.ambient");
                 materialPosition.diffuse = gl.getUniformLocation(shaderProgram, "matProperities.diffuse");
                 materialPosition.specular = gl.getUniformLocation(shaderProgram, "matProperities.specular");
 
+                lightPosition = {};
+                lightPosition.position = gl.getUniformLocation(shaderProgram, "light.position");
+                lightPosition.ambient = gl.getUniformLocation(shaderProgram, "light.ambient");
+                lightPosition.diffuse = gl.getUniformLocation(shaderProgram, "light.diffuse");
+                lightPosition.specular = gl.getUniformLocation(shaderProgram, "light.specular");
+
+                viewLocation = gl.getUniformLocation(shaderProgram, "view");
+                normalLocation = gl.getUniformLocation(shaderProgram, "normalMatrix");
                 viewProjectionPosition = gl.getUniformLocation(shaderProgram, "viewProjection");
             } // end if no shader program link errors
         } // end if no compile errors
@@ -203,6 +250,11 @@ function setupShaders() {
 function render(inputTriangles) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
 
+    gl.uniform3fv(lightPosition.position, Light.position);
+    gl.uniform3fv(lightPosition.ambient, Light.ambient);
+    gl.uniform3fv(lightPosition.diffuse, Light.diffuse);
+    gl.uniform3fv(lightPosition.specular, Light.specular);
+
     var ratio = gl.canvas.width / gl.canvas.height;
     var Target = vec3.create();
     vec3.add(Target, Eye, LookAt);
@@ -213,11 +265,17 @@ function render(inputTriangles) {
     mat4.perspective(projection, ratio, Math.PI / 3.2, 0.1, 10.0);
     var viewProjection = mat4.create();
     mat4.multiply(viewProjection, projection, view);
+
+    var normal = mat4.create();
+    mat4.invert(normal, view);
+    mat4.transpose(normal, normal);
+
+    gl.uniformMatrix4fv(viewLocation, false, view);
+    gl.uniformMatrix4fv(normalLocation, false, normal);
     gl.uniformMatrix4fv(viewProjectionPosition, false, viewProjection);  // for mat4 or mat4 array
 
     var trianglePtr = 0;
     for (var i = 0; i < inputTriangles.length; i++) {
-        console.log("here");
         gl.uniform3fv(materialPosition.ambient, inputTriangles[i].material.ambient);
         gl.uniform3fv(materialPosition.diffuse, inputTriangles[i].material.diffuse);
         gl.uniform3fv(materialPosition.specular, inputTriangles[i].material.specular);
@@ -225,6 +283,9 @@ function render(inputTriangles) {
         // vertex buffer: activate and feed into vertex shader
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate
         gl.vertexAttribPointer(vertexPositionAttrib,3,gl.FLOAT,false,0,0); // feed
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.vertexAttribPointer(vertexNormalAttrib, 3, gl.FLOAT, false, 0, 0);
 
         // triangle buffer: activate and render
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffer); // activate
@@ -245,7 +306,8 @@ function main() {
     loadTriangles(triangles);
     setupShaders(); // setup the webGL shaders
     render(triangles); // draw the triangles using webGL
+  }).catch(function (err) {
+    console.error(err);
   }); // load in the triangles from tri file
-
   
 } // end main

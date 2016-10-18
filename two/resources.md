@@ -1,0 +1,11 @@
+### Helpful WebGl, OpenGL, and GLSL Resources
++ [OpenGL Lighting](https://www.opengl.org/sdk/docs/tutorials/ClockworkCoders/lighting.php)
++ [The Shader Language for WebGL](http://math.hws.edu/eck/cs424/notes2013/19_GLSL.html)
++ [WebGL 3D Camera](http://webglfundamentals.org/webgl/lessons/webgl-3d-camera.html)
++ [Matrix Tutorial for OpenGL](http://www.opengl-tutorial.org/beginners-tutorials/tutorial-3-matrices/)
++ [Using WebGL for 3D Transformations](http://math.hws.edu/graphicsbook/c7/s1.html)
++ [WebGL: How It Works](http://webglfundamentals.org/webgl/lessons/webgl-how-it-works.html)
++ [WebGL Shaders and GLSL](http://webglfundamentals.org/webgl/lessons/webgl-shaders-and-glsl.html)
++ [GLSL: Introduction](http://nehe.gamedev.net/article/glsl_an_introduction/25007/)
++ [Learning WebGL: Spheres, etc.](http://learningwebgl.com/blog/?p=1253)
++ [Calculating Normal Matrix](http://stackoverflow.com/questions/21079623/how-to-calculate-the-normal-matrix)
