@@ -12,12 +12,11 @@ var LookUp = new vec3.fromValues(0.0, 1.0, 0.0);
 var WindowDistance = 0.5;
 
 var Light = {
-    position: new vec3.fromValues(2, 4, -0.5),
+    position: new vec3.fromValues(2.0, 4.0,-0.5),
     ambient: new vec3.fromValues(1.0, 1.0, 1.0),
     diffuse: new vec3.fromValues(1.0, 1.0, 1.0),
     specular: new vec3.fromValues(1.0, 1.0, 1.0),
 };
-
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
@@ -27,7 +26,7 @@ var normalBuffer;
 var triBufferSize = 0; // the number of indices in the triangle buffer
 var vertexPositionAttrib; // where to put position for vertex shader
 var vertexNormalAttrib;
-var materialPosition, viewProjectionPosition, viewLocation, normalLocation, lightPosition;
+var lightProductLocation, viewProjectionPosition, viewLocation, normalLocation, lightLocation;
 
 // ASSIGNMENT HELPER FUNCTIONS
 
@@ -104,7 +103,7 @@ function loadTriangles(inputTriangles) {
                 normToAdd = inputTriangles[whichSet].normals[whichSetVert];
                 vtxToAdd = inputTriangles[whichSet].vertices[whichSetVert];
                 coordArray.push(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]);
-                normArray.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]);
+                normArray.push(normToAdd[0], normToAdd[1], normToAdd[2]);
             } // end for vertices in set
             
             // set up the triangle index array, adjusting indices across sets
@@ -141,7 +140,6 @@ function loadTriangles(inputTriangles) {
 
 // setup the webGL shaders
 function setupShaders() {
-
     // define fragment shader in essl using es6 template strings
     var fShaderCode = `
         precision mediump float;
@@ -159,13 +157,23 @@ function setupShaders() {
         };
 
         uniform lightSource light;
-        uniform material matProperities;
+        uniform material lightProduct;
 
-        varying vec4 V;
-        varying vec4 N;
+        varying vec3 V;
+        varying vec3 N;
 
         void main(void) {
-            gl_FragColor = vec4(matProperities.diffuse, 1.0); // triangle's diffuse color only
+            vec3 L = normalize(light.position - V);
+            vec3 E = normalize(-V);
+            vec3 H = normalize(L + E);
+
+            vec3 Idiff = lightProduct.diffuse * max(dot(N, L), 0.0);
+            Idiff = clamp(Idiff, 0.0, 1.0);
+
+            vec3 Ispec = lightProduct.specular * pow(max(dot(N, H), 0.0), 4.0);
+            Ispec = clamp(Ispec, 0.0, 1.0);
+
+            gl_FragColor = vec4(lightProduct.ambient + Idiff + Ispec, 1.0); // triangle's diffuse color only
         }
     `;
     
@@ -178,13 +186,14 @@ function setupShaders() {
         attribute vec3 vertexNormal;
         attribute vec3 vertexPosition;
 
-        varying vec4 N;
-        varying vec4 V;
+        varying vec3 N;
+        varying vec3 V;
 
         void main(void) {
             gl_Position = vec4(vertexPosition, 1.0);
-            V = view * gl_Position;
-            N = normalMatrix * vec4(vertexNormal, 1.0);
+            V = vec3(view * gl_Position);
+            vec4 N4 = normalMatrix * vec4(vertexNormal, 1.0);
+            N = normalize(N4.xyz);
             gl_Position = viewProjection * gl_Position;
         }
     `;
@@ -223,16 +232,16 @@ function setupShaders() {
                 vertexNormalAttrib = gl.getAttribLocation(shaderProgram, "vertexNormal");
                 gl.enableVertexAttribArray(vertexNormalAttrib);
 
-                materialPosition = {};
-                materialPosition.ambient = gl.getUniformLocation(shaderProgram, "matProperities.ambient");
-                materialPosition.diffuse = gl.getUniformLocation(shaderProgram, "matProperities.diffuse");
-                materialPosition.specular = gl.getUniformLocation(shaderProgram, "matProperities.specular");
+                lightProductLocation = {};
+                lightProductLocation.ambient = gl.getUniformLocation(shaderProgram, "lightProduct.ambient");
+                lightProductLocation.diffuse = gl.getUniformLocation(shaderProgram, "lightProduct.diffuse");
+                lightProductLocation.specular = gl.getUniformLocation(shaderProgram, "lightProduct.specular");
 
-                lightPosition = {};
-                lightPosition.position = gl.getUniformLocation(shaderProgram, "light.position");
-                lightPosition.ambient = gl.getUniformLocation(shaderProgram, "light.ambient");
-                lightPosition.diffuse = gl.getUniformLocation(shaderProgram, "light.diffuse");
-                lightPosition.specular = gl.getUniformLocation(shaderProgram, "light.specular");
+                lightLocation = {};
+                lightLocation.position = gl.getUniformLocation(shaderProgram, "light.position");
+                lightLocation.ambient = gl.getUniformLocation(shaderProgram, "light.ambient");
+                lightLocation.diffuse = gl.getUniformLocation(shaderProgram, "light.diffuse");
+                lightLocation.specular = gl.getUniformLocation(shaderProgram, "light.specular");
 
                 viewLocation = gl.getUniformLocation(shaderProgram, "view");
                 normalLocation = gl.getUniformLocation(shaderProgram, "normalMatrix");
@@ -250,10 +259,10 @@ function setupShaders() {
 function render(inputTriangles) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
 
-    gl.uniform3fv(lightPosition.position, Light.position);
-    gl.uniform3fv(lightPosition.ambient, Light.ambient);
-    gl.uniform3fv(lightPosition.diffuse, Light.diffuse);
-    gl.uniform3fv(lightPosition.specular, Light.specular);
+    gl.uniform3fv(lightLocation.position, Light.position);
+    gl.uniform3fv(lightLocation.ambient, Light.ambient);
+    gl.uniform3fv(lightLocation.diffuse, Light.diffuse);
+    gl.uniform3fv(lightLocation.specular, Light.specular);
 
     var ratio = gl.canvas.width / gl.canvas.height;
     var Target = vec3.create();
@@ -276,9 +285,19 @@ function render(inputTriangles) {
 
     var trianglePtr = 0;
     for (var i = 0; i < inputTriangles.length; i++) {
-        gl.uniform3fv(materialPosition.ambient, inputTriangles[i].material.ambient);
-        gl.uniform3fv(materialPosition.diffuse, inputTriangles[i].material.diffuse);
-        gl.uniform3fv(materialPosition.specular, inputTriangles[i].material.specular);
+        var lightProduct = {};
+        lightProduct.ambient = vec3.create();
+        vec3.multiply(lightProduct.ambient, Light.ambient, inputTriangles[i].material.ambient);
+
+        lightProduct.diffuse = vec3.create();
+        vec3.multiply(lightProduct.diffuse, Light.diffuse, inputTriangles[i].material.diffuse);
+
+        lightProduct.specular = vec3.create();
+        vec3.multiply(lightProduct.specular, Light.specular, inputTriangles[i].material.specular);
+
+        gl.uniform3fv(lightProductLocation.ambient, lightProduct.ambient);
+        gl.uniform3fv(lightProductLocation.diffuse, lightProduct.diffuse);
+        gl.uniform3fv(lightProductLocation.specular, lightProduct.specular);
 
         // vertex buffer: activate and feed into vertex shader
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate
