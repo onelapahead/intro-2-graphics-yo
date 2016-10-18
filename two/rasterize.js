@@ -6,7 +6,11 @@ const WIN_LEFT = 0; const WIN_RIGHT = 1;  // default left and right x coords in 
 const WIN_BOTTOM = 0; const WIN_TOP = 1;  // default top and bottom y coords in world space
 const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog2/triangles.json"; // triangles file loc
 const INPUT_SPHERES_URL = "https://ncsucgclass.github.io/prog2/spheres.json"; // spheres file loc
-var Eye = new vec4.fromValues(0.5,0.5,-0.5,1.0); // default eye position in world space
+var Eye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
+var LookAt = new vec3.fromValues(0.0, 0.0, 1.0);
+var LookUp = new vec3.fromValues(0.0, 1.0, 0.0);
+var WindowDistance = 0.5;
+
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
@@ -14,7 +18,7 @@ var vertexBuffer; // this contains vertex coordinates in triples
 var triangleBuffer; // this contains indices into vertexBuffer in triples
 var triBufferSize = 0; // the number of indices in the triangle buffer
 var vertexPositionAttrib; // where to put position for vertex shader
-var materialPosition;
+var materialPosition, viewProjectionPosition;
 
 // ASSIGNMENT HELPER FUNCTIONS
 
@@ -139,10 +143,13 @@ function setupShaders() {
     
     // define vertex shader in essl using es6 template strings
     var vShaderCode = `
+
+        uniform mat4 viewProjection;
         attribute vec3 vertexPosition;
 
         void main(void) {
             gl_Position = vec4(vertexPosition, 1.0); // use the untransformed position
+            gl_Position = viewProjection * gl_Position;
         }
     `;
     
@@ -182,6 +189,7 @@ function setupShaders() {
                 materialPosition.diffuse = gl.getUniformLocation(shaderProgram, "matProperities.diffuse");
                 materialPosition.specular = gl.getUniformLocation(shaderProgram, "matProperities.specular");
 
+                viewProjectionPosition = gl.getUniformLocation(shaderProgram, "viewProjection");
             } // end if no shader program link errors
         } // end if no compile errors
     } // end try 
@@ -192,11 +200,24 @@ function setupShaders() {
 } // end setup shaders
 
 // render the loaded model
-function renderTriangles(inputTriangles) {
+function render(inputTriangles) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
+
+    var ratio = gl.canvas.width / gl.canvas.height;
+    var Target = vec3.create();
+    vec3.add(Target, Eye, LookAt);
+    console.log(Target);
+    var view = mat4.create();
+    mat4.lookAt(view, Eye, Target, LookUp);
+    var projection = mat4.create();
+    mat4.perspective(projection, ratio, Math.PI / 3.2, 0.1, 10.0);
+    var viewProjection = mat4.create();
+    mat4.multiply(viewProjection, projection, view);
+    gl.uniformMatrix4fv(viewProjectionPosition, false, viewProjection);  // for mat4 or mat4 array
 
     var trianglePtr = 0;
     for (var i = 0; i < inputTriangles.length; i++) {
+        console.log("here");
         gl.uniform3fv(materialPosition.ambient, inputTriangles[i].material.ambient);
         gl.uniform3fv(materialPosition.diffuse, inputTriangles[i].material.diffuse);
         gl.uniform3fv(materialPosition.specular, inputTriangles[i].material.specular);
@@ -223,7 +244,7 @@ function main() {
     var triangles = JSON.parse(data);
     loadTriangles(triangles);
     setupShaders(); // setup the webGL shaders
-    renderTriangles(triangles); // draw the triangles using webGL
+    render(triangles); // draw the triangles using webGL
   }); // load in the triangles from tri file
 
   
