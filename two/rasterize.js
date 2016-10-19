@@ -6,9 +6,20 @@ const WIN_LEFT = 0; const WIN_RIGHT = 1;  // default left and right x coords in 
 const WIN_BOTTOM = 0; const WIN_TOP = 1;  // default top and bottom y coords in world space
 const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog2/triangles.json"; // triangles file loc
 const INPUT_SPHERES_URL = "https://ncsucgclass.github.io/prog2/spheres.json"; // spheres file loc
-var Eye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
-var LookAt = new vec3.fromValues(0.0, 0.0, 1.0);
-var LookUp = new vec3.fromValues(0.0, 1.0, 0.0);
+var oEye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
+var oLookAt = new vec3.fromValues(0.0, 0.0, 1.0);
+var oLookUp = new vec3.fromValues(0.0, 1.0, 0.0);
+var Eye = vec3.create();
+var LookAt = vec3.create();
+var LookUp = vec3.create();
+
+function resetCamera() {
+  vec3.copy(Eye, oEye);
+  vec3.copy(LookAt, oLookAt);
+  vec3.copy(LookUp, oLookUp);
+}
+resetCamera();
+
 var WindowDistance = 0.5;
 
 var Light = {
@@ -365,6 +376,11 @@ function main() {
 
     if (pressedKeys['E'.charCodeAt(0)]) {
       mvmt[1] -= speed;
+    }
+
+    if (pressedKeys[27]) { // escape
+      mvmt = [0.0, 0.0, 0.0];
+      resetCamera();
     }
 
     mvmt = new vec3.fromValues(mvmt[0], mvmt[1], mvmt[2]);
