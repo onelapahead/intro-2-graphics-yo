@@ -12,10 +12,11 @@ var LookUp = new vec3.fromValues(0.0, 1.0, 0.0);
 var WindowDistance = 0.5;
 
 var Light = {
-    position: new vec3.fromValues(2.0, 4.0,-0.5),
+    position: new vec3.fromValues(2.0, 4.0, -0.5),
     ambient: new vec3.fromValues(1.0, 1.0, 1.0),
     diffuse: new vec3.fromValues(1.0, 1.0, 1.0),
     specular: new vec3.fromValues(1.0, 1.0, 1.0),
+    positionView: vec3.create(),
 };
 
 /* webgl globals */
@@ -147,6 +148,7 @@ function setupShaders() {
             vec3 ambient;
             vec3 diffuse;
             vec3 specular;
+            float shininess;
         };
 
         struct lightSource {
@@ -170,7 +172,7 @@ function setupShaders() {
             vec3 Idiff = lightProduct.diffuse * max(dot(N, L), 0.0);
             Idiff = clamp(Idiff, 0.0, 1.0);
 
-            vec3 Ispec = lightProduct.specular * pow(max(dot(N, H), 0.0), 4.0);
+            vec3 Ispec = lightProduct.specular * pow(max(dot(N, H), 0.0), 4.0 * lightProduct.shininess);
             Ispec = clamp(Ispec, 0.0, 1.0);
 
             gl_FragColor = vec4(lightProduct.ambient + Idiff + Ispec, 1.0); // triangle's diffuse color only
@@ -236,6 +238,7 @@ function setupShaders() {
                 lightProductLocation.ambient = gl.getUniformLocation(shaderProgram, "lightProduct.ambient");
                 lightProductLocation.diffuse = gl.getUniformLocation(shaderProgram, "lightProduct.diffuse");
                 lightProductLocation.specular = gl.getUniformLocation(shaderProgram, "lightProduct.specular");
+                lightProductLocation.shininess = gl.getUniformLocation(shaderProgram, "lightProduct.shininess");
 
                 lightLocation = {};
                 lightLocation.position = gl.getUniformLocation(shaderProgram, "light.position");
@@ -259,25 +262,25 @@ function setupShaders() {
 function render(inputTriangles) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
 
-    gl.uniform3fv(lightLocation.position, Light.position);
-    gl.uniform3fv(lightLocation.ambient, Light.ambient);
-    gl.uniform3fv(lightLocation.diffuse, Light.diffuse);
-    gl.uniform3fv(lightLocation.specular, Light.specular);
-
     var ratio = gl.canvas.width / gl.canvas.height;
     var Target = vec3.create();
     vec3.add(Target, Eye, LookAt);
-    console.log(Target);
     var view = mat4.create();
     mat4.lookAt(view, Eye, Target, LookUp);
     var projection = mat4.create();
-    mat4.perspective(projection, ratio, Math.PI / 3.2, 0.1, 10.0);
+    mat4.perspective(projection, Math.PI / 2, ratio, 0.5, 1.5);
     var viewProjection = mat4.create();
     mat4.multiply(viewProjection, projection, view);
 
     var normal = mat4.create();
     mat4.invert(normal, view);
     mat4.transpose(normal, normal);
+
+    vec3.transformMat4(Light.positionView, Light.position, view);
+    gl.uniform3fv(lightLocation.position, Light.positionView);
+    gl.uniform3fv(lightLocation.ambient, Light.ambient);
+    gl.uniform3fv(lightLocation.diffuse, Light.diffuse);
+    gl.uniform3fv(lightLocation.specular, Light.specular);
 
     gl.uniformMatrix4fv(viewLocation, false, view);
     gl.uniformMatrix4fv(normalLocation, false, normal);
@@ -295,9 +298,12 @@ function render(inputTriangles) {
         lightProduct.specular = vec3.create();
         vec3.multiply(lightProduct.specular, Light.specular, inputTriangles[i].material.specular);
 
+        lightProduct.shininess = inputTriangles[i].material.shininess;
+
         gl.uniform3fv(lightProductLocation.ambient, lightProduct.ambient);
         gl.uniform3fv(lightProductLocation.diffuse, lightProduct.diffuse);
         gl.uniform3fv(lightProductLocation.specular, lightProduct.specular);
+        gl.uniform1f(lightProductLocation.shininess, lightProduct.shininess);
 
         // vertex buffer: activate and feed into vertex shader
         gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate
@@ -318,13 +324,80 @@ function render(inputTriangles) {
 /* MAIN -- HERE is where execution begins after window load */
 
 function main() {
-  
+  var models = [];
+  var start;
+
+  var pressedKeys = new Array(128);
+
+  window.addEventListener("keydown", function (event) {
+      pressedKeys[event.keyCode] = true;
+  }, false);
+
+  window.addEventListener("keyup", function (event) {
+      pressedKeys[event.keyCode] = false;
+  }, false);
+
+  function loop(now) {
+    var dt = now - start;
+    start = now;
+    var speed = 1.0;
+    var mvmt = [0.0, 0.0, 0.0];
+
+    if (pressedKeys['A'.charCodeAt(0)]) {
+      mvmt[0] += speed;
+    }
+
+    if (pressedKeys['D'.charCodeAt(0)]) {
+      mvmt[0] -= speed;
+    }
+
+    if (pressedKeys['W'.charCodeAt(0)]) {
+      mvmt[2] += speed;
+    }
+
+    if (pressedKeys['S'.charCodeAt(0)]) {
+      mvmt[2] -= speed;
+    }
+
+    if (pressedKeys['Q'.charCodeAt(0)]) {
+      mvmt[1] += speed;
+    }
+
+    if (pressedKeys['E'.charCodeAt(0)]) {
+      mvmt[1] -= speed;
+    }
+
+    mvmt = new vec3.fromValues(mvmt[0], mvmt[1], mvmt[2]);
+    vec3.scale(mvmt, mvmt, dt / 1000);
+
+    vec3.add(Eye, Eye, mvmt);
+    render(models);
+
+    window.requestAnimationFrame(loop);
+  }
+
   setupWebGL(); // set up the webGL environment
-  loadResource(INPUT_TRIANGLES_URL).then(function (data) {
+  loadResource(INPUT_SPHERES_URL).then(function (data) {
+    var spheres = JSON.parse(data);
+    var sphere;
+    for (var i = 0; i < spheres.length; i++) {
+        sphere = new Sphere(spheres[i], 32, 32);
+        models.push(sphere.model);
+        console.log(sphere.model);
+    }
+
+    return loadResource(INPUT_TRIANGLES_URL);
+  }).then (function (data) {
     var triangles = JSON.parse(data);
-    loadTriangles(triangles);
+    for (var i = 0; i < triangles.length; i++) {
+        models.push(triangles[i]);
+        triangles[i].material.shininess = 1.0;
+    }
+
+    loadTriangles(models);
     setupShaders(); // setup the webGL shaders
-    render(triangles); // draw the triangles using webGL
+    start = performance.now();
+    loop(start);
   }).catch(function (err) {
     console.error(err);
   }); // load in the triangles from tri file
