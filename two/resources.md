@@ -9,3 +9,7 @@
 + [GLSL: Introduction](http://nehe.gamedev.net/article/glsl_an_introduction/25007/)
 + [Learning WebGL: Spheres, etc.](http://learningwebgl.com/blog/?p=1253)
 + [Calculating Normal Matrix](http://stackoverflow.com/questions/21079623/how-to-calculate-the-normal-matrix)
++ [Understanding the View Matrix](http://www.3dgep.com/understanding-the-view-matrix/)
++ [GameCamera Examples](https://github.com/toji/building-the-game/blob/part-1/public/js/camera.js)
++ [KeyCode Events](https://css-tricks.com/snippets/javascript/javascript-keycodes/)
+
