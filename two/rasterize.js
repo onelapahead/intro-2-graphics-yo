@@ -202,11 +202,12 @@ function setupShaders() {
             vec3 L = normalize(light.position - V);
             vec3 E = normalize(-V);
             vec3 H = normalize(L + E);
+            vec3 n = normalize(N);
 
-            vec3 Idiff = lightProduct.diffuse * max(dot(N, L), 0.0);
+            vec3 Idiff = lightProduct.diffuse * max(dot(n, L), 0.0);
             Idiff = clamp(Idiff, 0.0, 1.0);
 
-            vec3 Ispec = lightProduct.specular * pow(max(dot(N, H), 0.0), 4.0 * lightProduct.shininess);
+            vec3 Ispec = lightProduct.specular * pow(max(dot(n, H), 0.0), 4.0 * lightProduct.shininess);
             Ispec = clamp(Ispec, 0.0, 1.0);
 
             gl_FragColor = vec4(lightProduct.ambient + Idiff + Ispec, 1.0); // triangle's diffuse color only
