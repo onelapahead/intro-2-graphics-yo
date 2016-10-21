@@ -14,6 +14,9 @@ class Sphere {
     this.model.material.diffuse = params.diffuse;
     this.model.material.specular = params.specular;
     this.model.material.shininess = params.n;
+    this.model.transform = mat4.create();
+    this.model.center = vec4.fromValues(params.x, params.y, params.z, 1.0);
+    mat4.identity(this.model.transform);
 
     var vertex, normal;
     var theta, sinTheta, cosTheta, phi, sinPhi, cosPhi;
@@ -51,4 +54,15 @@ class Sphere {
       }
     }
   }
+}
+
+function calculateCOM(model) {
+  model.center = vec3.fromValues(0.0, 0.0, 0.0);
+  var vertex = vec3.create();
+  for (var i = 0; i < model.vertices.length; i++) {
+    vec3.set(vertex, model.vertices[i][0], model.vertices[i][1], model.vertices[i][2]);
+    vec3.add(model.center, vertex, model.center);
+  }
+  vec3.scale(model.center, model.center, 1.0 / model.vertices.length); // avg
+  model.center = vec4.fromValues(model.center[0], model.center[1], model.center[2], 1.0);
 }
