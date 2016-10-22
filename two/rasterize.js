@@ -6,23 +6,13 @@ const WIN_LEFT = 0; const WIN_RIGHT = 1;  // default left and right x coords in 
 const WIN_BOTTOM = 0; const WIN_TOP = 1;  // default top and bottom y coords in world space
 const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog2/triangles.json"; // triangles file loc
 const INPUT_SPHERES_URL = "https://ncsucgclass.github.io/prog2/spheres.json"; // spheres file loc
-var oEye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
-var oLookAt = new vec3.fromValues(0.0, 0.0, 1.0);
-var oLookUp = new vec3.fromValues(0.0, 1.0, 0.0);
-var Eye = vec3.create();
-var LookAt = vec3.create();
-var LookUp = vec3.create();
-var Target = vec3.create();
-var Origin = new vec3.fromValues(0.0, 0.0, 0.0);
-
-function resetCamera() {
-  vec3.copy(Eye, oEye);
-  vec3.copy(LookAt, oLookAt);
-  vec3.normalize(LookAt, LookAt);
-  vec3.copy(LookUp, oLookUp);
-  vec3.normalize(LookUp, LookUp);
-}
-resetCamera();
+var oEye = [0.5,0.5,-0.5]; // default eye position in world space
+var oLookAt = [0.0, 0.0, 1.0];
+var oLookUp = [0.0, 1.0, 0.0];
+const fovY = Math.PI / 4;
+const near = 0.5;
+const far = 1.5;
+var camera = new Camera(oEye, oLookAt, oLookUp, fovY, near, far);
 
 var models = [];
 var spheres = [];
@@ -140,27 +130,17 @@ function loadTriangles() {
 function render() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
 
-    var ratio = gl.canvas.width / gl.canvas.height;
-    var view = mat4.create();
-    mat4.lookAt(view, Eye, Target, LookUp);
-    var projection = mat4.create();
-    mat4.perspective(projection, Math.PI / 4, ratio, 0.5, 1.5);
-    var viewProjection = mat4.create();
-    mat4.multiply(viewProjection, projection, view);
+    camera.update();
 
-    var normal = mat4.create();
-    mat4.invert(normal, view);
-    mat4.transpose(normal, normal);
-
-    vec3.transformMat4(Light.positionView, Light.position, view);
+    vec3.transformMat4(Light.positionView, Light.position, camera.view);
     gl.uniform3fv(lightLocation.position, Light.positionView);
     gl.uniform3fv(lightLocation.ambient, Light.ambient);
     gl.uniform3fv(lightLocation.diffuse, Light.diffuse);
     gl.uniform3fv(lightLocation.specular, Light.specular);
 
-    gl.uniformMatrix4fv(viewLocation, false, view);
-    gl.uniformMatrix4fv(normalLocation, false, normal);
-    gl.uniformMatrix4fv(viewProjectionLocation, false, viewProjection);  // for mat4 or mat4 array
+    gl.uniformMatrix4fv(viewLocation, false, camera.view);
+    gl.uniformMatrix4fv(normalLocation, false, camera.normal);
+    gl.uniformMatrix4fv(viewProjectionLocation, false, camera.viewProjection);  // for mat4 or mat4 array
 
     var trianglePtr = 0;
     var material;
@@ -254,25 +234,11 @@ function updateCamera(dt) {
 
   if (downKeys[27]) { // escape
     mvmt = [0.0, 0.0, 0.0];
-    resetCamera();
+    camera.reset();
   }
 
-  mvmt = new vec3.fromValues(mvmt[0], mvmt[1], mvmt[2]);
-  vec3.scale(mvmt, mvmt, dt);
-
-  vec3.add(Eye, Eye, mvmt);
-
-  vec3.add(Target, Eye, LookAt);
-
-  vec3.rotateX(Target, Target, Eye, rotate[0] * dt);
-  vec3.rotateY(Target, Target, Eye, rotate[1] * dt);
-  vec3.rotateZ(Target, Target, Eye, rotate[2] * dt);
-  vec3.sub(LookAt, Target, Eye);
-
-  vec3.rotateX(LookUp, LookUp, Origin, rotate[0] * dt);
-  vec3.rotateY(LookUp, LookUp, Origin, rotate[1] * dt);
-  vec3.rotateZ(LookUp, LookUp, Origin, rotate[2] * dt);
-  vec3.normalize(LookUp, LookUp);
+  camera.move(mvmt, dt);
+  camera.rotate(rotate, dt);
 }
 
 const UP = 38, LEFT = 37, RIGHT = 39, DOWN = 40, SPACE = 32;
@@ -344,7 +310,7 @@ function updateSelection(dt) {
     var rotation = mat4.create();
     var temp = mat4.create();
     translate = vec3.create();
-    vec3.negate(translate, vec3.fromValues(selected.center[0], selected.center[1], selected.center[2]));
+    vec3.negate(translate, new vec3.fromValues(selected.center[0], selected.center[1], selected.center[2]));
     mat4.fromTranslation(rotation, translate);
     mat4.fromXRotation(temp, rotate[0] * dt);
     mat4.multiply(rotation, temp, rotation);
@@ -352,12 +318,11 @@ function updateSelection(dt) {
     mat4.multiply(rotation, temp, rotation);
     mat4.fromZRotation(temp, rotate[2] * dt);
     mat4.multiply(rotation, temp, rotation);
-    translate = vec3.fromValues(selected.center[0], selected.center[1], selected.center[2]);
+    translate = new vec3.fromValues(selected.center[0], selected.center[1], selected.center[2]);
     mat4.fromTranslation(temp, translate);
     mat4.multiply(rotation, temp, rotation);
 
     mat4.multiply(selected.transform, rotation, selected.transform);
-
   }
 }
 
@@ -409,7 +374,6 @@ function update(dt) {
   updateSelection(dt);
 }
 
-
 /* MAIN -- HERE is where execution begins after window load */
 
 function main() {
@@ -457,10 +421,10 @@ function main() {
   }).then (function (data) {
     var rawTriangles = JSON.parse(data);
     for (var i = 0; i < rawTriangles.length; i++) {
-      rawTriangles[i].material.shininess = 1.0;
+      rawTriangles[i].material.shininess = rawTriangles[i].material.n;
       rawTriangles[i].transform = mat4.create();
       mat4.identity(rawTriangles[i].transform);
-      calculateCOM(rawTriangles[i]);
+      calculateModelCOM(rawTriangles[i]);
       models.push(rawTriangles[i]);
       triangles.push(rawTriangles[i]);
     }
@@ -468,6 +432,7 @@ function main() {
 
     loadTriangles();
     setupShaders(); // setup the webGL shaders
+    camera.update();
     start = performance.now();
     loop(start);
   }).catch(function (err) {

@@ -56,7 +56,7 @@ class Sphere {
   }
 }
 
-function calculateCOM(model) {
+function calculateModelCOM(model) {
   model.center = vec3.fromValues(0.0, 0.0, 0.0);
   var vertex = vec3.create();
   for (var i = 0; i < model.vertices.length; i++) {
