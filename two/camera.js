@@ -27,7 +27,19 @@ class Camera {
   }
 
   move(mvmt, dt) {
-    mvmt = new vec3.fromValues(mvmt[0], mvmt[1], mvmt[2]);
+    var z = new vec3.fromValues(this.cLookAt[0], this.cLookAt[1], this.cLookAt[2]);
+    var y = new vec3.fromValues(this.cLookUp[0], this.cLookUp[1], this.cLookUp[2]);
+    var x = vec3.create();
+    vec3.cross(x, y, z);
+    vec3.normalize(x, x);
+    vec3.scale(z, z, mvmt[2]);
+    vec3.scale(y, y, mvmt[1]);
+    vec3.scale(x, x, mvmt[0]);
+
+    mvmt = new vec3.fromValues(0.0, 0.0, 0.0);
+    vec3.add(mvmt, mvmt, x);
+    vec3.add(mvmt, mvmt, y);
+    vec3.add(mvmt, mvmt, z);
     vec3.scale(mvmt, mvmt, dt);
 
     var translate = mat4.create();
