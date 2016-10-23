@@ -15,7 +15,8 @@ class Sphere {
     this.model.material.specular = params.specular;
     this.model.material.shininess = params.n;
     this.model.transform = mat4.create();
-    this.model.center = vec4.fromValues(params.x, params.y, params.z, 1.0);
+    this.model.origin = vec4.fromValues(params.x, params.y, params.z, 1.0);
+    this.model.center = vec4.clone(this.model.origin);
     mat4.identity(this.model.transform);
 
     var vertex, normal;
@@ -64,5 +65,6 @@ function calculateModelCOM(model) {
     vec3.add(model.center, vertex, model.center);
   }
   vec3.scale(model.center, model.center, 1.0 / model.vertices.length); // avg
-  model.center = vec4.fromValues(model.center[0], model.center[1], model.center[2], 1.0);
+  model.origin = vec4.fromValues(model.center[0], model.center[1], model.center[2], 1.0);
+  model.center = vec4.clone(model.origin);
 }

@@ -237,6 +237,7 @@ function updateCamera(dt) {
     camera.reset();
   }
 
+  camera.axes();
   camera.move(mvmt, dt);
   camera.rotate(rotate, dt);
 }
@@ -296,33 +297,16 @@ function updateSelection(dt) {
     if (downKeys[8]) { // backspace
       mvmt = [0.0, 0.0, 0.0];
       mat4.identity(selected.transform);
+      selected.center = vec4.clone(selected.origin);
     }
 
-    mvmt = new vec3.fromValues(mvmt[0], mvmt[1], mvmt[2]);
-    vec3.scale(mvmt, mvmt, dt);
-
-    var translate = mat4.create();
-    mat4.fromTranslation(translate, mvmt);
-
+    camera.axes();
+    var translate = camera.translation(mvmt, dt);
     mat4.multiply(selected.transform, translate, selected.transform);
     mat4.multiply(selected.center, translate, selected.center);
-
-    var rotation = mat4.create();
-    var temp = mat4.create();
-    translate = vec3.create();
-    vec3.negate(translate, new vec3.fromValues(selected.center[0], selected.center[1], selected.center[2]));
-    mat4.fromTranslation(rotation, translate);
-    mat4.fromXRotation(temp, rotate[0] * dt);
-    mat4.multiply(rotation, temp, rotation);
-    mat4.fromYRotation(temp, rotate[1] * dt);
-    mat4.multiply(rotation, temp, rotation);
-    mat4.fromZRotation(temp, rotate[2] * dt);
-    mat4.multiply(rotation, temp, rotation);
-    translate = new vec3.fromValues(selected.center[0], selected.center[1], selected.center[2]);
-    mat4.fromTranslation(temp, translate);
-    mat4.multiply(rotation, temp, rotation);
-
+    var rotation = camera.rotation(rotate, selected.center, dt);
     mat4.multiply(selected.transform, rotation, selected.transform);
+
   }
 }
 

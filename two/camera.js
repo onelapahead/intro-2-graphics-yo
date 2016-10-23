@@ -24,17 +24,24 @@ class Camera {
     this.far = far;
 
     this.normal = mat4.create();
+
+    this.z = vec3.create();
+    this.y = vec3.create();
+    this.x = vec3.create();
   }
 
-  move(mvmt, dt) {
-    var z = new vec3.fromValues(this.cLookAt[0], this.cLookAt[1], this.cLookAt[2]);
-    var y = new vec3.fromValues(this.cLookUp[0], this.cLookUp[1], this.cLookUp[2]);
-    var x = vec3.create();
-    vec3.cross(x, y, z);
-    vec3.normalize(x, x);
-    vec3.scale(z, z, mvmt[2]);
-    vec3.scale(y, y, mvmt[1]);
-    vec3.scale(x, x, mvmt[0]);
+  axes() {
+    vec3.copy(this.z, this.cLookAt);
+    vec3.copy(this.y, this.cLookUp);
+    vec3.cross(this.x, this.y, this.z);
+    vec3.normalize(this.x, this.x);
+  }
+
+  translation(mvmt, dt) {
+    var x = vec3.create(), y = vec3.create(), z = vec3.create();
+    vec3.scale(z, this.z, mvmt[2]);
+    vec3.scale(y, this.y, mvmt[1]);
+    vec3.scale(x, this.x, mvmt[0]);
 
     mvmt = new vec3.fromValues(0.0, 0.0, 0.0);
     vec3.add(mvmt, mvmt, x);
@@ -42,29 +49,36 @@ class Camera {
     vec3.add(mvmt, mvmt, z);
     vec3.scale(mvmt, mvmt, dt);
 
-    var translate = mat4.create();
-    mat4.fromTranslation(translate, mvmt);
+    var T = mat4.create();
+    mat4.fromTranslation(T, mvmt);
+    return T;
+  }
 
-    mat4.multiply(this.transform, translate, this.transform);
+  move(mvmt, dt) {
+    var T = this.translation(mvmt, dt);
+    mat4.multiply(this.transform, T, this.transform);
+  }
+
+  rotation(rtn, point, dt) {
+    var R = mat4.create();
+    var temp = mat4.create();
+    var T = vec3.create();
+    vec3.negate(T, point);
+    mat4.fromTranslation(R, T);
+    mat4.fromRotation(temp, rtn[0] * dt, this.x);
+    mat4.multiply(R, temp, R);
+    mat4.fromRotation(temp, rtn[1] * dt, this.y);
+    mat4.multiply(R, temp, R);
+    mat4.fromRotation(temp, rtn[2] * dt, this.z);
+    mat4.multiply(R, temp, R);
+    mat4.fromTranslation(temp, point);
+    mat4.multiply(R, temp, R);
+    return R;
   }
 
   rotate(rtn, dt) {
-    var rotation = mat4.create();
-    var temp = mat4.create();
-    var translate = vec3.create();
-    vec3.negate(translate, new vec3.fromValues(this.cEye[0], this.cEye[1], this.cEye[2]));
-    mat4.fromTranslation(rotation, translate);
-    mat4.fromXRotation(temp, rtn[0] * dt);
-    mat4.multiply(rotation, temp, rotation);
-    mat4.fromYRotation(temp, rtn[1] * dt);
-    mat4.multiply(rotation, temp, rotation);
-    mat4.fromZRotation(temp, rtn[2] * dt);
-    mat4.multiply(rotation, temp, rotation);
-    translate = new vec3.fromValues(this.cEye[0], this.cEye[1], this.cEye[2]);
-    mat4.fromTranslation(temp, translate);
-    mat4.multiply(rotation, temp, rotation);
-
-    mat4.multiply(this.transform, rotation, this.transform);
+    var R = this.rotation(rtn, this.cEye, dt);
+    mat4.multiply(this.transform, R, this.transform);
   }
 
   update() {
