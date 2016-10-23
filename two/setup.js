@@ -1,17 +1,3 @@
-/* webgl globals */
-var gl = null; // the all powerful gl object. It's all here folks!
-var vertexBuffer; // this contains vertex coordinates in triples
-var triangleBuffer; // this contains indices into vertexBuffer in triples
-var normalBuffer;
-var triBufferSize = 0; // the number of indices in the triangle buffer
-var vertexPositionAttrib, // where to put position for vertex shader
-    vertexNormalAttrib,
-    lightProductLocation,
-    viewProjectionLocation,
-    viewLocation,
-    normalLocation,
-    lightLocation,
-    transformLocation;
 
 // set up the webGL environment
 function setupWebGL() {
@@ -41,6 +27,7 @@ function setupShaders() {
     // define fragment shader in essl using es6 template strings
     var fShaderCode = `
         precision mediump float;
+        #define MAX_LIGHTS 20
         struct material {
             vec3 ambient;
             vec3 diffuse;
@@ -48,32 +35,33 @@ function setupShaders() {
             float shininess;
         };
 
-        struct lightSource {
-            vec3 position;
-            vec3 ambient;
-            vec3 diffuse;
-            vec3 specular;
-        };
-
-        uniform lightSource light;
-        uniform material lightProduct;
+        uniform int nLights;
+        uniform vec3 lights[MAX_LIGHTS];
+        uniform material lightProducts[MAX_LIGHTS];
 
         varying vec3 V;
         varying vec3 N;
 
         void main(void) {
-            vec3 L = normalize(light.position - V);
-            vec3 E = normalize(-V);
-            vec3 H = normalize(L + E);
-            vec3 n = normalize(N);
+            vec3 color = vec3(0.0, 0.0, 0.0);
+            for (int i = 0; i < MAX_LIGHTS; i++) {
+              if (i >= nLights) break;
+              vec3 L = normalize(lights[i] - V);
+              vec3 E = normalize(-V);
+              vec3 H = normalize(L + E);
+              vec3 n = normalize(N);
 
-            vec3 Idiff = lightProduct.diffuse * max(dot(n, L), 0.0);
-            Idiff = clamp(Idiff, 0.0, 1.0);
+              vec3 Idiff = lightProducts[i].diffuse * max(dot(n, L), 0.0);
+              Idiff = clamp(Idiff, 0.0, 1.0);
 
-            vec3 Ispec = lightProduct.specular * pow(max(dot(n, H), 0.0), 4.0 * lightProduct.shininess);
-            Ispec = clamp(Ispec, 0.0, 1.0);
+              vec3 Ispec = lightProducts[i].specular * pow(max(dot(n, H), 0.0), 4.0 * lightProducts[i].shininess);
+              Ispec = clamp(Ispec, 0.0, 1.0);
+            
+              color = clamp(color + lightProducts[i].ambient + Idiff + Ispec, 0.0, 1.0);
+            }
 
-            gl_FragColor = vec4(lightProduct.ambient + Idiff + Ispec, 1.0); // triangle's diffuse color only
+
+            gl_FragColor = vec4(color, 1.0); // triangle's diffuse color only
         }
     `;
     
@@ -133,22 +121,21 @@ function setupShaders() {
                 vertexNormalAttrib = gl.getAttribLocation(shaderProgram, "vertexNormal");
                 gl.enableVertexAttribArray(vertexNormalAttrib);
 
-                lightProductLocation = {};
-                lightProductLocation.ambient = gl.getUniformLocation(shaderProgram, "lightProduct.ambient");
-                lightProductLocation.diffuse = gl.getUniformLocation(shaderProgram, "lightProduct.diffuse");
-                lightProductLocation.specular = gl.getUniformLocation(shaderProgram, "lightProduct.specular");
-                lightProductLocation.shininess = gl.getUniformLocation(shaderProgram, "lightProduct.shininess");
+                for (var i = 0; i < lights.length; i++) {
+                  lightProductsLocation[i] = {};
+                  lightProductsLocation[i].ambient = gl.getUniformLocation(shaderProgram, "lightProducts["+i+"].ambient");
+                  lightProductsLocation[i].diffuse = gl.getUniformLocation(shaderProgram, "lightProducts["+i+"].diffuse");
+                  lightProductsLocation[i].specular = gl.getUniformLocation(shaderProgram, "lightProducts["+i+"].specular");
+                  lightProductsLocation[i].shininess = gl.getUniformLocation(shaderProgram, "lightProducts["+i+"].shininess");
 
-                lightLocation = {};
-                lightLocation.position = gl.getUniformLocation(shaderProgram, "light.position");
-                lightLocation.ambient = gl.getUniformLocation(shaderProgram, "light.ambient");
-                lightLocation.diffuse = gl.getUniformLocation(shaderProgram, "light.diffuse");
-                lightLocation.specular = gl.getUniformLocation(shaderProgram, "light.specular");
+                  lightsLocation[i] = gl.getUniformLocation(shaderProgram, "lights["+i+"]");
+                }
 
                 transformLocation = gl.getUniformLocation(shaderProgram, "transform");
                 viewLocation = gl.getUniformLocation(shaderProgram, "view");
                 normalLocation = gl.getUniformLocation(shaderProgram, "normalMatrix");
                 viewProjectionLocation = gl.getUniformLocation(shaderProgram, "viewProjection");
+                numberOfLightsLoc = gl.getUniformLocation(shaderProgram, "nLights");
             } // end if no shader program link errors
         } // end if no compile errors
     } // end try 
