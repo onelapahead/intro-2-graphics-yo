@@ -4,7 +4,9 @@
 const INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog2/triangles.json"; // triangles file loc
 const INPUT_SPHERES_URL = "https://ncsucgclass.github.io/prog2/spheres.json"; // spheres file loc
 const INPUT_LIGHTS_URL = "https://ncsucgclass.github.io/prog2/lights.json";
-//const INPUT_LIGHTS_URL = "http://pastebin.com/raw/AnzpEvZH";
+// const INPUT_TRIANGLES_URL = "http://localhost:8000/data/triangles.json"; // triangles file loc
+// const INPUT_SPHERES_URL = "http://localhost:8000/data/spheres.json"; // spheres file loc
+// const INPUT_LIGHTS_URL = "http://localhost:8000/data/lights.json";
 
 var oEye = [0.5,0.5,-0.5]; // default eye position in world space
 var oLookAt = [0.0, 0.0, 1.0];
