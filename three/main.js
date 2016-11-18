@@ -14,6 +14,7 @@ var lightPosition = vec3.fromValues(2,4,-0.5); // default light position
 var rotateTheta = Math.PI/50; // how much to rotate models by with each key press
 
 /* webgl and geometry data */
+// TODO globals for texture coord buffers and maybe textures
 var gl = null; // the all powerful gl object. It's all here folks!
 var inputTriangles = []; // the triangle data as loaded from input files
 var numTriangleSets = 0; // how many triangle sets in input scene
@@ -99,6 +100,8 @@ function getJSONFile(url,descr) {
 
 // does stuff when keys are pressed
 function handleKeyDown(event) {
+    // TODO add delta time to make smoother motion
+
     const modelEnum = {TRIANGLES: "triangles", SPHERE: "sphere"}; // enumerated model type
     const dirEnum = {NEGATIVE: -1, POSITIVE: 1}; // enumerated rotation direction
     
@@ -289,6 +292,7 @@ function setupWebGL() {
         gl.clearColor(0.0, 0.0, 0.0, 1.0); // use black when we clear the frame buffer
         gl.clearDepth(1.0); // use max when we clear the depth buffer
         gl.enable(gl.DEPTH_TEST); // use hidden surface removal (with zbuffering)
+        // TODO toggle z-buffering for transparent objects
       }
     } // end try
     
@@ -301,10 +305,13 @@ function setupWebGL() {
 // read models in, load them into webgl buffers
 function loadModels() {
     
+    // TODO use loadResource rather than get JSON file
+    // TODO load textures as Image objects -- src, onload
+
     // make a sphere with radius 1 at the origin, with numLongSteps longitudes. 
     // Returns verts, tris and normals.
     function makeSphere(numLongSteps) {
-        
+        // TODO u, v interpolation/generation -- figure out what to set north and south poles (0.5, 1.0) & (0.5, 0)?
         try {
             if (numLongSteps % 2 != 0)
                 throw "in makeSphere: uneven number of longitude steps!";
@@ -383,6 +390,7 @@ function loadModels() {
                 inputTriangles[whichSet].glNormals = []; // flat normal list for webgl
                 var numVerts = inputTriangles[whichSet].vertices.length; // num vertices in tri set
                 for (whichSetVert=0; whichSetVert<numVerts; whichSetVert++) { // verts in set
+                    // TODO add uv and buffers
                     vtxToAdd = inputTriangles[whichSet].vertices[whichSetVert]; // get vertex to add
                     normToAdd = inputTriangles[whichSet].normals[whichSetVert]; // get normal to add
                     inputTriangles[whichSet].glVertices.push(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]); // put coords in set coord list
@@ -469,17 +477,20 @@ function loadModels() {
 
 // setup the webGL shaders
 function setupShaders() {
-    
+    // TODO add pointers for texture attribute
+    // TODO uniform sampler2D for texture, need pointer for uniform too
     // define vertex shader in essl using es6 template strings
     var vShaderCode = `
         attribute vec3 aVertexPosition; // vertex position
         attribute vec3 aVertexNormal; // vertex normal
+        attribute vec2 aVertexTextureCoords;
         
         uniform mat4 umMatrix; // the model matrix
         uniform mat4 upvmMatrix; // the project view model matrix
         
         varying vec3 vWorldPos; // interpolated world position of vertex
         varying vec3 vVertexNormal; // interpolated normal for frag shader
+        varying vec2 vTextureCoords;
 
         void main(void) {
             
@@ -491,6 +502,8 @@ function setupShaders() {
             // vertex normal (assume no non-uniform scale)
             vec4 vWorldNormal4 = umMatrix * vec4(aVertexNormal, 0.0);
             vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z)); 
+
+            vTextureCoords = aVertexTextureCoords;
         }
     `;
     
@@ -516,7 +529,9 @@ function setupShaders() {
         // geometry properties
         varying vec3 vWorldPos; // world xyz of fragment
         varying vec3 vVertexNormal; // normal of fragment
-            
+
+        varying vec2 vTextureCoords;
+
         void main(void) {
         
             // ambient term
@@ -605,6 +620,9 @@ function setupShaders() {
 // render the loaded model
 function renderModels() {
     
+    // TODO add delta time calculation
+    // TODO load textures for each material/model via uniform
+
     // construct the model transform matrix, based on model state
     function makeModelTransform(currModel) {
         var zAxis = vec3.create(), sumRotation = mat4.create(), temp = mat4.create(), negCenter = vec3.create();
