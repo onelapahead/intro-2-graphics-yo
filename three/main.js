@@ -129,18 +129,18 @@ function handleKeyDown(event) {
 
     const modelEnum = {TRIANGLES: "triangles", SPHERE: "sphere"}; // enumerated model type
     const dirEnum = {NEGATIVE: -1, POSITIVE: 1}; // enumerated rotation direction
-    
+
     function highlightModel(modelType,whichModel) {
         if (handleKeyDown.modelOn != null)
             handleKeyDown.modelOn.on = false;
         handleKeyDown.whichOn = whichModel;
         if (modelType == modelEnum.TRIANGLES)
-            handleKeyDown.modelOn = inputTriangles[whichModel]; 
+            handleKeyDown.modelOn = inputTriangles[whichModel];
         else
-            handleKeyDown.modelOn = inputSpheres[whichModel]; 
-        handleKeyDown.modelOn.on = true; 
+            handleKeyDown.modelOn = inputSpheres[whichModel];
+        handleKeyDown.modelOn.on = true;
     } // end highlight model
-    
+
     function translateModel(offset) {
         if (handleKeyDown.modelOn != null)
             vec3.add(handleKeyDown.modelOn.translation,handleKeyDown.modelOn.translation,offset);
@@ -155,20 +155,20 @@ function handleKeyDown(event) {
             vec3.transformMat4(handleKeyDown.modelOn.yAxis,handleKeyDown.modelOn.yAxis,newRotation); // rotate model y axis tip
         } // end if there is a highlighted model
     } // end rotate model
-    
+
     // set up needed view params
     var lookAt = vec3.create(), viewRight = vec3.create(), temp = vec3.create(); // lookat, right & temp vectors
     lookAt = vec3.normalize(lookAt,vec3.subtract(temp,Center,Eye)); // get lookat vector
     viewRight = vec3.normalize(viewRight,vec3.cross(temp,lookAt,Up)); // get view right vector
-    
+
     // highlight static variables
     handleKeyDown.whichOn = handleKeyDown.whichOn == undefined ? -1 : handleKeyDown.whichOn; // nothing selected initially
     handleKeyDown.modelOn = handleKeyDown.modelOn == undefined ? null : handleKeyDown.modelOn; // nothing selected initially
 
     switch (event.code) {
-        
+
         // model selection
-        case "Space": 
+        case "Space":
             if (handleKeyDown.modelOn != null)
                 handleKeyDown.modelOn.on = false; // turn off highlighted model
             handleKeyDown.modelOn = null; // no highlighted model
@@ -186,7 +186,7 @@ function handleKeyDown(event) {
         case "ArrowDown": // select previous sphere
             highlightModel(modelEnum.SPHERE,(handleKeyDown.whichOn > 0) ? handleKeyDown.whichOn-1 : numSpheres-1);
             break;
-            
+
         // view change
         case "KeyA": // translate view left, rotate left with shift
             Center = vec3.add(Center,Center,vec3.scale(temp,viewRight,viewDelta));
@@ -201,7 +201,7 @@ function handleKeyDown(event) {
         case "KeyS": // translate view backward, rotate up with shift
             if (event.getModifierState("Shift")) {
                 Center = vec3.add(Center,Center,vec3.scale(temp,Up,viewDelta));
-                Up = vec.cross(Up,viewRight,vec3.subtract(lookAt,Center,Eye)); /* global side effect */
+                Up = vec3.cross(Up,viewRight,vec3.subtract(lookAt,Center,Eye)); /* global side effect */
             } else {
                 Eye = vec3.add(Eye,Eye,vec3.scale(temp,lookAt,-viewDelta));
                 Center = vec3.add(Center,Center,vec3.scale(temp,lookAt,-viewDelta));
@@ -210,7 +210,7 @@ function handleKeyDown(event) {
         case "KeyW": // translate view forward, rotate down with shift
             if (event.getModifierState("Shift")) {
                 Center = vec3.add(Center,Center,vec3.scale(temp,Up,-viewDelta));
-                Up = vec.cross(Up,viewRight,vec3.subtract(lookAt,Center,Eye)); /* global side effect */
+                Up = vec3.cross(Up,viewRight,vec3.subtract(lookAt,Center,Eye)); /* global side effect */
             } else {
                 Eye = vec3.add(Eye,Eye,vec3.scale(temp,lookAt,viewDelta));
                 Center = vec3.add(Center,Center,vec3.scale(temp,lookAt,viewDelta));
@@ -237,7 +237,7 @@ function handleKeyDown(event) {
             Center = vec3.copy(Center,defaultCenter);
             Up = vec3.copy(Up,defaultUp);
             break;
-            
+
         // model transformation
         case "KeyK": // translate left, rotate left with shift
             if (event.getModifierState("Shift"))
@@ -263,7 +263,7 @@ function handleKeyDown(event) {
             else
                 translateModel(vec3.scale(temp,lookAt,viewDelta));
             break;
-        case "KeyI": // translate up, rotate counterclockwise with shift 
+        case "KeyI": // translate up, rotate counterclockwise with shift
             if (event.getModifierState("Shift"))
                 rotateModel(lookAt,dirEnum.POSITIVE);
             else
@@ -283,8 +283,8 @@ function handleKeyDown(event) {
             } // end for all triangle sets
             for (var whichSphere=0; whichSphere<numSpheres; whichSphere++) {
                 vec3.set(inputSpheres[whichSphere].translation,0,0,0);
-                vec3.set(inputSpheres[whichTriSet].xAxis,1,0,0);
-                vec3.set(inputSpheres[whichTriSet].yAxis,0,1,0);
+                vec3.set(inputSpheres[whichSphere].xAxis,1,0,0);
+                vec3.set(inputSpheres[whichSphere].yAxis,0,1,0);
             } // end for all spheres
             break;
     } // end switch
@@ -292,7 +292,7 @@ function handleKeyDown(event) {
 
 // set up the webGL environment
 function setupWebGL() {
-    
+
     // Set up keys
     document.onkeydown = handleKeyDown; // call this when key pressed
 
@@ -300,13 +300,13 @@ function setupWebGL() {
         new Promise(function(resolve, reject) {
             // Get the image canvas, render an image in it
             var imageCanvas = document.getElementById("myImageCanvas"); // create a 2d canvas
-            var cw = imageCanvas.width, ch = imageCanvas.height; 
-            imageContext = imageCanvas.getContext("2d"); 
-            var bkgdImage = new Image(); 
+            var cw = imageCanvas.width, ch = imageCanvas.height;
+            imageContext = imageCanvas.getContext("2d");
+            var bkgdImage = new Image();
             bkgdImage.onload = function(){
                 var iw = bkgdImage.width, ih = bkgdImage.height;
                 imageContext.drawImage(bkgdImage,0,0,iw,ih,0,0,cw,ch);
-                resolve(true);  
+                resolve(true);
             }; // end onload callback
 
             bkgdImage.onerror = function(err) {
@@ -315,7 +315,7 @@ function setupWebGL() {
             bkgdImage.src = INPUT_DIR + "stars.jpg";
         })
     );
-    
+
     // create a webgl canvas and set it up
     var webGLCanvas = document.getElementById("myWebGLCanvas"); // create a webgl canvas
     gl = webGLCanvas.getContext("webgl"); // get a webgl object from it
@@ -329,14 +329,162 @@ function setupWebGL() {
         // TODO toggle z-buffering for transparent objects
       }
     } // end try
-    
+
     catch(e) {
       console.log(e);
     } // end catch
- 
+
 } // end setupWebGL
 
-// make a sphere with radius 1 at the origin, with numLongSteps longitudes. 
+// setup the webGL shaders
+function setupShaders() {
+    // define vertex shader in essl using es6 template strings
+    var vShaderCode = `
+        attribute vec3 aVertexPosition; // vertex position
+        attribute vec3 aVertexNormal; // vertex normal
+        attribute vec2 aVertexTextureCoords;
+
+        uniform mat4 umMatrix; // the model matrix
+        uniform mat4 upvmMatrix; // the project view model matrix
+
+        varying vec3 vWorldPos; // interpolated world position of vertex
+        varying vec3 vVertexNormal; // interpolated normal for frag shader
+        varying highp vec2 vTextureCoords;
+
+        void main(void) {
+
+            // vertex position
+            vec4 vWorldPos4 = umMatrix * vec4(aVertexPosition, 1.0);
+            vWorldPos = vec3(vWorldPos4.x,vWorldPos4.y,vWorldPos4.z);
+            gl_Position = upvmMatrix * vec4(aVertexPosition, 1.0);
+
+            // vertex normal (assume no non-uniform scale)
+            vec4 vWorldNormal4 = umMatrix * vec4(aVertexNormal, 0.0);
+            vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z));
+
+            vTextureCoords = aVertexTextureCoords;
+        }
+    `;
+
+    // define fragment shader in essl using es6 template strings
+    var fShaderCode = `
+        precision mediump float; // set float to medium precision
+
+        // eye location
+        uniform vec3 uEyePosition; // the eye's position in world
+
+        // light properties
+        uniform vec3 uLightAmbient; // the light's ambient color
+        uniform vec3 uLightDiffuse; // the light's diffuse color
+        uniform vec3 uLightSpecular; // the light's specular color
+        uniform vec3 uLightPosition; // the light's position
+
+        // material properties
+        uniform vec3 uAmbient; // the ambient reflectivity
+        uniform vec3 uDiffuse; // the diffuse reflectivity
+        uniform vec3 uSpecular; // the specular reflectivity
+        uniform float uShininess; // the specular exponent
+
+        // geometry properties
+        varying vec3 vWorldPos; // world xyz of fragment
+        varying vec3 vVertexNormal; // normal of fragment
+
+        varying highp vec2 vTextureCoords;
+        uniform sampler2D uTexture;
+        uniform float uAlpha;
+
+        void main(void) {
+
+            // ambient term
+            vec3 ambient = uAmbient*uLightAmbient;
+
+            // diffuse term
+            vec3 normal = normalize(vVertexNormal);
+            vec3 light = normalize(uLightPosition - vWorldPos);
+            float lambert = max(0.0,dot(normal,light));
+            vec3 diffuse = uDiffuse*uLightDiffuse*lambert; // diffuse term
+
+            // specular term
+            vec3 eye = normalize(uEyePosition - vWorldPos);
+            vec3 halfVec = normalize(light+eye);
+            float highlight = pow(max(0.0,dot(normal,halfVec)),uShininess);
+            vec3 specular = uSpecular*uLightSpecular*highlight; // specular term
+
+            // combine to output color
+            vec3 colorOut = ambient + diffuse + specular; // no specular yet
+            gl_FragColor = vec4(colorOut, uAlpha) * texture2D(uTexture, vec2(vTextureCoords.s, vTextureCoords.t));
+        }
+    `;
+
+    try {
+        var fShader = gl.createShader(gl.FRAGMENT_SHADER); // create frag shader
+        gl.shaderSource(fShader,fShaderCode); // attach code to shader
+        gl.compileShader(fShader); // compile the code for gpu execution
+
+        var vShader = gl.createShader(gl.VERTEX_SHADER); // create vertex shader
+        gl.shaderSource(vShader,vShaderCode); // attach code to shader
+        gl.compileShader(vShader); // compile the code for gpu execution
+
+        if (!gl.getShaderParameter(fShader, gl.COMPILE_STATUS)) { // bad frag shader compile
+            throw "error during fragment shader compile: " + gl.getShaderInfoLog(fShader);
+            gl.deleteShader(fShader);
+        } else if (!gl.getShaderParameter(vShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
+            throw "error during vertex shader compile: " + gl.getShaderInfoLog(vShader);
+            gl.deleteShader(vShader);
+        } else { // no compile errors
+            var shaderProgram = gl.createProgram(); // create the single shader program
+            gl.attachShader(shaderProgram, fShader); // put frag shader in program
+            gl.attachShader(shaderProgram, vShader); // put vertex shader in program
+            gl.linkProgram(shaderProgram); // link program into gl context
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
+                throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
+            } else { // no shader program link errors
+                gl.useProgram(shaderProgram); // activate shader program (frag and vert)
+
+                // locate and enable vertex attributes
+                vPosAttribLoc = gl.getAttribLocation(shaderProgram, "aVertexPosition"); // ptr to vertex pos attrib
+                gl.enableVertexAttribArray(vPosAttribLoc); // connect attrib to array
+                vNormAttribLoc = gl.getAttribLocation(shaderProgram, "aVertexNormal"); // ptr to vertex normal attrib
+                gl.enableVertexAttribArray(vNormAttribLoc); // connect attrib to array
+
+                // locate vertex uniforms
+                mMatrixULoc = gl.getUniformLocation(shaderProgram, "umMatrix"); // ptr to mmat
+                pvmMatrixULoc = gl.getUniformLocation(shaderProgram, "upvmMatrix"); // ptr to pvmmat
+
+                // locate fragment uniforms
+                var eyePositionULoc = gl.getUniformLocation(shaderProgram, "uEyePosition"); // ptr to eye position
+                var lightAmbientULoc = gl.getUniformLocation(shaderProgram, "uLightAmbient"); // ptr to light ambient
+                var lightDiffuseULoc = gl.getUniformLocation(shaderProgram, "uLightDiffuse"); // ptr to light diffuse
+                var lightSpecularULoc = gl.getUniformLocation(shaderProgram, "uLightSpecular"); // ptr to light specular
+                var lightPositionULoc = gl.getUniformLocation(shaderProgram, "uLightPosition"); // ptr to light position
+                ambientULoc = gl.getUniformLocation(shaderProgram, "uAmbient"); // ptr to ambient
+                diffuseULoc = gl.getUniformLocation(shaderProgram, "uDiffuse"); // ptr to diffuse
+                specularULoc = gl.getUniformLocation(shaderProgram, "uSpecular"); // ptr to specular
+                shininessULoc = gl.getUniformLocation(shaderProgram, "uShininess"); // ptr to shininess
+
+                // locate texture pointers
+                vTextCoordAttribLoc = gl.getAttribLocation(shaderProgram, "aVertexTextureCoords");
+                gl.enableVertexAttribArray(vTextCoordAttribLoc);
+                textureULoc = gl.getUniformLocation(shaderProgram, "uTexture"); // ptr to texture
+                alphaULoc = gl.getUniformLocation(shaderProgram, "uAlpha");
+
+                // pass global constants into fragment uniforms
+                gl.uniform3fv(eyePositionULoc,Eye); // pass in the eye's position
+                gl.uniform3fv(lightAmbientULoc,lightAmbient); // pass in the light's ambient emission
+                gl.uniform3fv(lightDiffuseULoc,lightDiffuse); // pass in the light's diffuse emission
+                gl.uniform3fv(lightSpecularULoc,lightSpecular); // pass in the light's specular emission
+                gl.uniform3fv(lightPositionULoc,lightPosition); // pass in the light's position
+            } // end if no shader program link errors
+        } // end if no compile errors
+    } // end try
+
+    catch(e) {
+        console.log(e);
+    } // end catch
+} // end setup shaders
+
+// make a sphere with radius 1 at the origin, with numLongSteps longitudes.
 // Returns verts, tris and normals.
 function makeSphere(numLongSteps) {
     try {
@@ -345,7 +493,7 @@ function makeSphere(numLongSteps) {
         else if (numLongSteps < 4)
             throw "in makeSphere: number of longitude steps too small!";
         else { // good number longitude steps
-        
+
             var sphereVertices = [];
             var sphereUVs = [];
             // make vertices and normals
@@ -389,7 +537,7 @@ function makeSphere(numLongSteps) {
             return({vertices:sphereVertices, normals:sphereNormals, triangles:sphereTriangles, uvs: sphereUVs});
         } // end if good number longitude steps
     } // end try
-    
+
     catch(e) {
         console.log(e);
     } // end catch
@@ -410,13 +558,13 @@ function loadTriangles(data) {
     // process each triangle set to load webgl vertex and triangle buffers
     numTriangleSets = inputTriangles.length; // remember how many tri sets
     for (var whichSet=0; whichSet<numTriangleSets; whichSet++) { // for each tri set
-        
+
         // set up hilighting, modeling translation and rotation
         inputTriangles[whichSet].center = vec3.fromValues(0,0,0);  // center point of tri set
         inputTriangles[whichSet].on = false; // not highlighted
         inputTriangles[whichSet].translation = vec3.fromValues(0,0,0); // no translation
         inputTriangles[whichSet].xAxis = vec3.fromValues(1,0,0); // model X axis
-        inputTriangles[whichSet].yAxis = vec3.fromValues(0,1,0); // model Y axis 
+        inputTriangles[whichSet].yAxis = vec3.fromValues(0,1,0); // model Y axis
 
         if (!inputTriangles[whichSet].material.texture) {
             inputTriangles[whichSet].material.glTexture = defaultTexture;
@@ -451,7 +599,7 @@ function loadTriangles(data) {
         normalBuffers[whichSet] = gl.createBuffer(); // init empty webgl set normal component buffer
         gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichSet]); // activate that buffer
         gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(inputTriangles[whichSet].glNormals),gl.STATIC_DRAW); // data in
-    
+
         uvBuffers[whichSet] = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[whichSet]);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(inputTriangles[whichSet].glTextureCoords), gl.STATIC_DRAW);
@@ -469,7 +617,12 @@ function loadTriangles(data) {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[whichSet]); // activate that buffer
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(inputTriangles[whichSet].glTriangles),gl.STATIC_DRAW); // data in
 
-    } // end for each triangle set 
+        if (inputTriangles[whichSet].material.alpha != 1.0) {
+            translucentObjects.triangles.push(whichSet);
+        } else {
+            opaqueObjects.triangles.push(whichSet);
+        }
+    } // end for each triangle set
     return loadResource(INPUT_SPHERES_URL);
 }
 
@@ -500,6 +653,12 @@ function loadSpheres(data) {
                 loadTexture(sphere, INPUT_DIR + sphere.texture)
             );
         }
+
+        if (sphere.alpha != 1.0) {
+            translucentObjects.spheres.push(whichSphere);
+        } else {
+            opaqueObjects.spheres.push(whichSphere);
+        }
     } // end for each sphere
     viewDelta = vec3.length(vec3.subtract(temp,maxCorner,minCorner)) / 100; // set global
 
@@ -524,162 +683,13 @@ function loadSpheres(data) {
     triangleBuffers.push(gl.createBuffer()); // init empty triangle index buffer
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[triangleBuffers.length-1]); // activate that buffer
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(oneSphere.triangles),gl.STATIC_DRAW); // data in
+
     return Promise.all(textureLoaders);
 }
 
-// setup the webGL shaders
-function setupShaders() {
-    // define vertex shader in essl using es6 template strings
-    var vShaderCode = `
-        attribute vec3 aVertexPosition; // vertex position
-        attribute vec3 aVertexNormal; // vertex normal
-        attribute vec2 aVertexTextureCoords;
-        
-        uniform mat4 umMatrix; // the model matrix
-        uniform mat4 upvmMatrix; // the project view model matrix
-        
-        varying vec3 vWorldPos; // interpolated world position of vertex
-        varying vec3 vVertexNormal; // interpolated normal for frag shader
-        varying highp vec2 vTextureCoords;
-
-        void main(void) {
-            
-            // vertex position
-            vec4 vWorldPos4 = umMatrix * vec4(aVertexPosition, 1.0);
-            vWorldPos = vec3(vWorldPos4.x,vWorldPos4.y,vWorldPos4.z);
-            gl_Position = upvmMatrix * vec4(aVertexPosition, 1.0);
-
-            // vertex normal (assume no non-uniform scale)
-            vec4 vWorldNormal4 = umMatrix * vec4(aVertexNormal, 0.0);
-            vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z)); 
-
-            vTextureCoords = aVertexTextureCoords;
-        }
-    `;
-    
-    // define fragment shader in essl using es6 template strings
-    var fShaderCode = `
-        precision mediump float; // set float to medium precision
-
-        // eye location
-        uniform vec3 uEyePosition; // the eye's position in world
-        
-        // light properties
-        uniform vec3 uLightAmbient; // the light's ambient color
-        uniform vec3 uLightDiffuse; // the light's diffuse color
-        uniform vec3 uLightSpecular; // the light's specular color
-        uniform vec3 uLightPosition; // the light's position
-        
-        // material properties
-        uniform vec3 uAmbient; // the ambient reflectivity
-        uniform vec3 uDiffuse; // the diffuse reflectivity
-        uniform vec3 uSpecular; // the specular reflectivity
-        uniform float uShininess; // the specular exponent
-        
-        // geometry properties
-        varying vec3 vWorldPos; // world xyz of fragment
-        varying vec3 vVertexNormal; // normal of fragment
-
-        varying highp vec2 vTextureCoords;
-        uniform sampler2D uTexture;
-        uniform float uAlpha;
-
-        void main(void) {
-        
-            // ambient term
-            vec3 ambient = uAmbient*uLightAmbient; 
-            
-            // diffuse term
-            vec3 normal = normalize(vVertexNormal); 
-            vec3 light = normalize(uLightPosition - vWorldPos);
-            float lambert = max(0.0,dot(normal,light));
-            vec3 diffuse = uDiffuse*uLightDiffuse*lambert; // diffuse term
-            
-            // specular term
-            vec3 eye = normalize(uEyePosition - vWorldPos);
-            vec3 halfVec = normalize(light+eye);
-            float highlight = pow(max(0.0,dot(normal,halfVec)),uShininess);
-            vec3 specular = uSpecular*uLightSpecular*highlight; // specular term
-            
-            // combine to output color
-            vec3 colorOut = ambient + diffuse + specular; // no specular yet
-            gl_FragColor = vec4(colorOut, uAlpha);
-
-            gl_FragColor = gl_FragColor * vec4(texture2D(uTexture, vec2(vTextureCoords.s, vTextureCoords.t)).xyz, 1.0);
-        }
-    `;
-    
-    try {
-        var fShader = gl.createShader(gl.FRAGMENT_SHADER); // create frag shader
-        gl.shaderSource(fShader,fShaderCode); // attach code to shader
-        gl.compileShader(fShader); // compile the code for gpu execution
-
-        var vShader = gl.createShader(gl.VERTEX_SHADER); // create vertex shader
-        gl.shaderSource(vShader,vShaderCode); // attach code to shader
-        gl.compileShader(vShader); // compile the code for gpu execution
-            
-        if (!gl.getShaderParameter(fShader, gl.COMPILE_STATUS)) { // bad frag shader compile
-            throw "error during fragment shader compile: " + gl.getShaderInfoLog(fShader);  
-            gl.deleteShader(fShader);
-        } else if (!gl.getShaderParameter(vShader, gl.COMPILE_STATUS)) { // bad vertex shader compile
-            throw "error during vertex shader compile: " + gl.getShaderInfoLog(vShader);  
-            gl.deleteShader(vShader);
-        } else { // no compile errors
-            var shaderProgram = gl.createProgram(); // create the single shader program
-            gl.attachShader(shaderProgram, fShader); // put frag shader in program
-            gl.attachShader(shaderProgram, vShader); // put vertex shader in program
-            gl.linkProgram(shaderProgram); // link program into gl context
-
-            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // bad program link
-                throw "error during shader program linking: " + gl.getProgramInfoLog(shaderProgram);
-            } else { // no shader program link errors
-                gl.useProgram(shaderProgram); // activate shader program (frag and vert)
-                
-                // locate and enable vertex attributes
-                vPosAttribLoc = gl.getAttribLocation(shaderProgram, "aVertexPosition"); // ptr to vertex pos attrib
-                gl.enableVertexAttribArray(vPosAttribLoc); // connect attrib to array
-                vNormAttribLoc = gl.getAttribLocation(shaderProgram, "aVertexNormal"); // ptr to vertex normal attrib
-                gl.enableVertexAttribArray(vNormAttribLoc); // connect attrib to array
-
-                // locate vertex uniforms
-                mMatrixULoc = gl.getUniformLocation(shaderProgram, "umMatrix"); // ptr to mmat
-                pvmMatrixULoc = gl.getUniformLocation(shaderProgram, "upvmMatrix"); // ptr to pvmmat
-                
-                // locate fragment uniforms
-                var eyePositionULoc = gl.getUniformLocation(shaderProgram, "uEyePosition"); // ptr to eye position
-                var lightAmbientULoc = gl.getUniformLocation(shaderProgram, "uLightAmbient"); // ptr to light ambient
-                var lightDiffuseULoc = gl.getUniformLocation(shaderProgram, "uLightDiffuse"); // ptr to light diffuse
-                var lightSpecularULoc = gl.getUniformLocation(shaderProgram, "uLightSpecular"); // ptr to light specular
-                var lightPositionULoc = gl.getUniformLocation(shaderProgram, "uLightPosition"); // ptr to light position
-                ambientULoc = gl.getUniformLocation(shaderProgram, "uAmbient"); // ptr to ambient
-                diffuseULoc = gl.getUniformLocation(shaderProgram, "uDiffuse"); // ptr to diffuse
-                specularULoc = gl.getUniformLocation(shaderProgram, "uSpecular"); // ptr to specular
-                shininessULoc = gl.getUniformLocation(shaderProgram, "uShininess"); // ptr to shininess
-                
-                // locate texture pointers
-                vTextCoordAttribLoc = gl.getAttribLocation(shaderProgram, "aVertexTextureCoords");
-                gl.enableVertexAttribArray(vTextCoordAttribLoc);
-                textureULoc = gl.getUniformLocation(shaderProgram, "uTexture"); // ptr to texture
-                alphaULoc = gl.getUniformLocation(shaderProgram, "uAlpha");
-
-                // pass global constants into fragment uniforms
-                gl.uniform3fv(eyePositionULoc,Eye); // pass in the eye's position
-                gl.uniform3fv(lightAmbientULoc,lightAmbient); // pass in the light's ambient emission
-                gl.uniform3fv(lightDiffuseULoc,lightDiffuse); // pass in the light's diffuse emission
-                gl.uniform3fv(lightSpecularULoc,lightSpecular); // pass in the light's specular emission
-                gl.uniform3fv(lightPositionULoc,lightPosition); // pass in the light's position
-            } // end if no shader program link errors
-        } // end if no compile errors
-    } // end try 
-    
-    catch(e) {
-        console.log(e);
-    } // end catch
-} // end setup shaders
-
 // render the loaded model
 function renderModels(dt) {
-    
+
     // construct the model transform matrix, based on model state
     function makeModelTransform(currModel) {
         var zAxis = vec3.create(), sumRotation = mat4.create(), temp = mat4.create(), negCenter = vec3.create();
@@ -696,7 +706,7 @@ function renderModels(dt) {
         mat4.fromTranslation(mMatrix,currModel.translation); // translate in model matrix
         mat4.multiply(mMatrix,mMatrix,sumRotation); // rotate in model matrix
     } // end make model transform
-    
+
     var hMatrix = mat4.create(); // handedness matrix
     var pMatrix = mat4.create(); // projection matrix
     var vMatrix = mat4.create(); // view matrix
@@ -704,11 +714,11 @@ function renderModels(dt) {
     var hpvMatrix = mat4.create(); // hand * proj * view matrices
     var hpvmMatrix = mat4.create(); // hand * proj * view * model matrices
     const highlightMaterial = {ambient:[0.5,0.5,0], diffuse:[0.5,0.5,0], specular:[0,0,0], n:1, glTexture: defaultTexture, alpha: 1.0}; // hlht mat
-    
+
     // window.requestAnimationFrame(renderModels); // set up frame render callbacks
-    
+
     gl.clear(/*gl.COLOR_BUFFER_BIT |*/ gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
-    
+
     // set up handedness, projection and view
     mat4.fromScaling(hMatrix,vec3.fromValues(-1,1,1)); // create handedness matrix
     mat4.perspective(pMatrix,0.5*Math.PI,1,0.1,10); // create projection matrix
@@ -716,19 +726,21 @@ function renderModels(dt) {
     mat4.multiply(hpvMatrix,hMatrix,pMatrix); // handedness * projection
     mat4.multiply(hpvMatrix,hpvMatrix,vMatrix); // handedness * projection * view
 
-    // render each triangle set
-    var currSet, setMaterial; // the tri set and its material properties
-    for (var whichTriSet=0; whichTriSet<numTriangleSets; whichTriSet++) {
-        currSet = inputTriangles[whichTriSet];
-        
+    gl.enable(gl.DEPTH_TEST);
+    gl.disable(gl.BLEND);
+    var whichSet;
+    for (var tI = 0; tI < opaqueObjects.triangles.length; tI++) {
+        whichSet = opaqueObjects.triangles[tI];
+        currSet = inputTriangles[whichSet];
+
         // make model transform, add to view project
         makeModelTransform(currSet);
         mat4.multiply(hpvmMatrix,hpvMatrix,mMatrix); // handedness * project * view * model
         gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in the m matrix
         gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix); // pass in the hpvm matrix
-        
+
         // reflectivity: feed to the fragment shader
-        if (inputTriangles[whichTriSet].on)
+        if (currSet.on)
             setMaterial = highlightMaterial; // highlight material
         else
             setMaterial = currSet.material; // normal material
@@ -744,35 +756,33 @@ function renderModels(dt) {
         gl.uniform1f(alphaULoc, setMaterial.alpha);
 
         // vertex buffer: activate and feed into vertex shader
-        gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichTriSet]); // activate
+        gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichSet]); // activate
         gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed
-        gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichTriSet]); // activate
+        gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichSet]); // activate
         gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[whichTriSet]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[whichSet]);
         gl.vertexAttribPointer(vTextCoordAttribLoc, 2, gl.FLOAT, false, 0, 0);
 
         // triangle buffer: activate and render
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[whichTriSet]); // activate
-        gl.drawElements(gl.TRIANGLES,3*triSetSizes[whichTriSet],gl.UNSIGNED_SHORT,0); // render
-        
-    } // end for each triangle set
-    
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[whichSet]); // activate
+        gl.drawElements(gl.TRIANGLES,3*triSetSizes[whichSet],gl.UNSIGNED_SHORT,0); // render
+    }
+
     // render each sphere
     var sphere, currentMaterial, instanceTransform = mat4.create(); // the current sphere and material
     gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[vertexBuffers.length-1]); // activate vertex buffer
     gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed vertex buffer to shader
     gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[normalBuffers.length-1]); // activate normal buffer
     gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed normal buffer to shader
-    
+
     gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[uvBuffers.length - 1]);
     gl.vertexAttribPointer(vTextCoordAttribLoc, 2, gl.FLOAT, false, 0, 0);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[triangleBuffers.length-1]); // activate tri buffer
+    for (var sI = 0; sI < opaqueObjects.spheres.length; sI++) {
+        sphere = inputSpheres[opaqueObjects.spheres[sI]];
 
-    for (var whichSphere=0; whichSphere<numSpheres; whichSphere++) {
-        sphere = inputSpheres[whichSphere];
-        
         // define model transform, premult with pvmMatrix, feed to shader
         makeModelTransform(sphere);
         mat4.fromTranslation(instanceTransform,vec3.fromValues(sphere.x,sphere.y,sphere.z)); // recenter sphere
@@ -800,7 +810,93 @@ function renderModels(dt) {
 
         // draw a transformed instance of the sphere
         gl.drawElements(gl.TRIANGLES,triSetSizes[triSetSizes.length-1],gl.UNSIGNED_SHORT,0); // render
-    } // end for each sphere
+    }
+
+    gl.disable(gl.DEPTH_TEST);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.enable(gl.BLEND);
+    // render each sphere
+    gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[vertexBuffers.length-1]); // activate vertex buffer
+    gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed vertex buffer to shader
+    gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[normalBuffers.length-1]); // activate normal buffer
+    gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed normal buffer to shader
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[uvBuffers.length - 1]);
+    gl.vertexAttribPointer(vTextCoordAttribLoc, 2, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[triangleBuffers.length-1]); // activate tri buffer
+    for (var sI = 0; sI < translucentObjects.spheres.length; sI++) {
+        sphere = inputSpheres[translucentObjects.spheres[sI]];
+
+        // define model transform, premult with pvmMatrix, feed to shader
+        makeModelTransform(sphere);
+        mat4.fromTranslation(instanceTransform,vec3.fromValues(sphere.x,sphere.y,sphere.z)); // recenter sphere
+        mat4.scale(mMatrix,mMatrix,vec3.fromValues(sphere.r,sphere.r,sphere.r)); // change size
+        mat4.multiply(mMatrix,instanceTransform,mMatrix); // apply recenter sphere
+        hpvmMatrix = mat4.multiply(hpvmMatrix,hpvMatrix,mMatrix); // premultiply with hpv matrix
+        gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in model matrix
+        gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix); // pass in handed project view model matrix
+
+        // reflectivity: feed to the fragment shader
+        if (sphere.on)
+            currentMaterial = highlightMaterial;
+        else
+            currentMaterial = sphere;
+        gl.uniform3fv(ambientULoc,currentMaterial.ambient); // pass in the ambient reflectivity
+        gl.uniform3fv(diffuseULoc,currentMaterial.diffuse); // pass in the diffuse reflectivity
+        gl.uniform3fv(specularULoc,currentMaterial.specular); // pass in the specular reflectivity
+        gl.uniform1f(shininessULoc,currentMaterial.n); // pass in the specular exponent
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, currentMaterial.glTexture);
+        gl.uniform1i(textureULoc, 0);
+
+        gl.uniform1f(alphaULoc, currentMaterial.alpha);
+
+        // draw a transformed instance of the sphere
+        gl.drawElements(gl.TRIANGLES,triSetSizes[triSetSizes.length-1],gl.UNSIGNED_SHORT,0); // render
+    }
+
+    for (var tI = 0; tI < translucentObjects.triangles.length; tI++) {
+        whichSet = translucentObjects.triangles[tI]
+        currSet = inputTriangles[whichSet];
+
+        // make model transform, add to view project
+        makeModelTransform(currSet);
+        mat4.multiply(hpvmMatrix,hpvMatrix,mMatrix); // handedness * project * view * model
+        gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in the m matrix
+        gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix); // pass in the hpvm matrix
+
+        // reflectivity: feed to the fragment shader
+        if (currSet.on)
+            setMaterial = highlightMaterial; // highlight material
+        else
+            setMaterial = currSet.material; // normal material
+        gl.uniform3fv(ambientULoc,setMaterial.ambient); // pass in the ambient reflectivity
+        gl.uniform3fv(diffuseULoc,setMaterial.diffuse); // pass in the diffuse reflectivity
+        gl.uniform3fv(specularULoc,setMaterial.specular); // pass in the specular reflectivity
+        gl.uniform1f(shininessULoc,setMaterial.n); // pass in the specular exponent
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, setMaterial.glTexture);
+        gl.uniform1i(textureULoc, 0);
+
+        gl.uniform1f(alphaULoc, setMaterial.alpha);
+
+        // vertex buffer: activate and feed into vertex shader
+        gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichSet]); // activate
+        gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed
+        gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichSet]); // activate
+        gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[whichSet]);
+        gl.vertexAttribPointer(vTextCoordAttribLoc, 2, gl.FLOAT, false, 0, 0);
+
+        // triangle buffer: activate and render
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[whichSet]); // activate
+        gl.drawElements(gl.TRIANGLES,3*triSetSizes[whichSet],gl.UNSIGNED_SHORT,0); // render
+    }
+
 } // end render model
 
 /* MAIN -- HERE is where execution begins after window load */
@@ -809,7 +905,7 @@ function main() {
   function loop(now) {
     dt = now - start;
     start = now;
-    
+
     renderModels(dt / 1000);
 
     window.requestAnimationFrame(loop);
@@ -842,5 +938,5 @@ function main() {
   //   }
   //   return loadResource(INPUT_SPHERES_URL);
   // }
-  
+
 } // end main
