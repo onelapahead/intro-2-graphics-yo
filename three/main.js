@@ -14,6 +14,9 @@ var lightPosition = vec3.fromValues(2,4,-0.5); // default light position
 var rotateTheta = Math.PI/50; // how much to rotate models by with each key press
 
 var defaultTexture = null;
+var maxCorner = vec3.fromValues(Number.MIN_VALUE,Number.MIN_VALUE,Number.MIN_VALUE); // bbox corner
+var minCorner = vec3.fromValues(Number.MAX_VALUE,Number.MAX_VALUE,Number.MAX_VALUE); // other corner
+
 
 /* webgl and geometry data */
 var gl = null; // the all powerful gl object. It's all here folks!
@@ -119,33 +122,6 @@ function createSolidTexture(r, g, b, a) {
     gl.bindTexture(gl.TEXTURE_2D, null);
     return texture;
 }
-
-// get the JSON file from the passed URL
-function getJSONFile(url,descr) {
-    try {
-        if ((typeof(url) !== "string") || (typeof(descr) !== "string"))
-            throw "getJSONFile: parameter not a string";
-        else {
-            var httpReq = new XMLHttpRequest(); // a new http request
-            httpReq.open("GET",url,false); // init the request
-            httpReq.send(null); // send the request
-            var startTime = Date.now();
-            while ((httpReq.status !== 200) && (httpReq.readyState !== XMLHttpRequest.DONE)) {
-                if ((Date.now()-startTime) > 3000)
-                    break;
-            } // until its loaded or we time out after three seconds
-            if ((httpReq.status !== 200) || (httpReq.readyState !== XMLHttpRequest.DONE))
-                throw "Unable to open "+descr+" file!";
-            else
-                return JSON.parse(httpReq.response); 
-        } // end if good params
-    } // end try    
-    
-    catch(e) {
-        console.log(e);
-        return(String.null);
-    }
-} // end get input spheres
 
 // does stuff when keys are pressed
 function handleKeyDown(event) {
@@ -320,16 +296,25 @@ function setupWebGL() {
     // Set up keys
     document.onkeydown = handleKeyDown; // call this when key pressed
 
-    // Get the image canvas, render an image in it
-    var imageCanvas = document.getElementById("myImageCanvas"); // create a 2d canvas
-    var cw = imageCanvas.width, ch = imageCanvas.height; 
-    imageContext = imageCanvas.getContext("2d"); 
-    var bkgdImage = new Image(); 
-    bkgdImage.src = INPUT_DIR + "stars.jpg";
-    bkgdImage.onload = function(){
-        var iw = bkgdImage.width, ih = bkgdImage.height;
-        imageContext.drawImage(bkgdImage,0,0,iw,ih,0,0,cw,ch);   
-    } // end onload callback
+    textureLoaders.push(
+        new Promise(function(resolve, reject) {
+            // Get the image canvas, render an image in it
+            var imageCanvas = document.getElementById("myImageCanvas"); // create a 2d canvas
+            var cw = imageCanvas.width, ch = imageCanvas.height; 
+            imageContext = imageCanvas.getContext("2d"); 
+            var bkgdImage = new Image(); 
+            bkgdImage.onload = function(){
+                var iw = bkgdImage.width, ih = bkgdImage.height;
+                imageContext.drawImage(bkgdImage,0,0,iw,ih,0,0,cw,ch);
+                resolve(true);  
+            }; // end onload callback
+
+            bkgdImage.onerror = function(err) {
+                reject(err);
+            };
+            bkgdImage.src = INPUT_DIR + "stars.jpg";
+        })
+    );
     
     // create a webgl canvas and set it up
     var webGLCanvas = document.getElementById("myWebGLCanvas"); // create a webgl canvas
@@ -351,214 +336,196 @@ function setupWebGL() {
  
 } // end setupWebGL
 
-// read models in, load them into webgl buffers
-function loadModels() {
-    
-    // TODO use loadResource rather than get JSON file
-
-    // make a sphere with radius 1 at the origin, with numLongSteps longitudes. 
-    // Returns verts, tris and normals.
-    function makeSphere(numLongSteps) {
-        try {
-            if (numLongSteps % 2 != 0)
-                throw "in makeSphere: uneven number of longitude steps!";
-            else if (numLongSteps < 4)
-                throw "in makeSphere: number of longitude steps too small!";
-            else { // good number longitude steps
-            
-                var sphereVertices = [];
-                var sphereUVs = [];
-                // make vertices and normals
-                for (var latNumber = 0; latNumber <= numLongSteps; latNumber++) {
-                  var theta = latNumber * Math.PI / numLongSteps;
-                  var sinTheta = Math.sin(theta);
-                  var cosTheta = Math.cos(theta);
-
-                  for (var longNumber = 0; longNumber <= numLongSteps; longNumber++) {
-                    var phi = longNumber * 2 * Math.PI / numLongSteps;
-                    var sinPhi = Math.sin(phi);
-                    var cosPhi = Math.cos(phi);
-
-                    var x = cosPhi * sinTheta;
-                    var y = cosTheta;
-                    var z = sinPhi * sinTheta;
-                    var u = (longNumber / numLongSteps);
-                    var v = (latNumber / numLongSteps);
-
-                    sphereUVs.push(u, v);
-                    sphereVertices.push(x, y, z);
-                  }
-                }
-                var sphereNormals = sphereVertices.slice(); // for this sphere, vertices = normals; return these
-
-                // make triangles, from south pole to middle latitudes to north pole
-                var sphereTriangles = []; // triangles to return
-                for (var latNumber = 0; latNumber < numLongSteps; latNumber++) {
-                  for (var longNumber = 0; longNumber < numLongSteps; longNumber++) {
-                    var first = (latNumber * (numLongSteps + 1)) + longNumber;
-                    var second = first + numLongSteps + 1;
-                    sphereTriangles.push(first);
-                    sphereTriangles.push(second);
-                    sphereTriangles.push(first + 1);
-
-                    sphereTriangles.push(second);
-                    sphereTriangles.push(second + 1);
-                    sphereTriangles.push(first + 1);
-                  }
-                }
-                return({vertices:sphereVertices, normals:sphereNormals, triangles:sphereTriangles, uvs: sphereUVs});
-            } // end if good number longitude steps
-        } // end try
-        
-        catch(e) {
-            console.log(e);
-        } // end catch
-    } // end make sphere
-    
-    defaultTexture = createSolidTexture(255, 255, 255, 255);
-    inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles"); // read in the triangle data
-
+// make a sphere with radius 1 at the origin, with numLongSteps longitudes. 
+// Returns verts, tris and normals.
+function makeSphere(numLongSteps) {
     try {
-        if (inputTriangles == String.null)
-            throw "Unable to load triangles file!";
-        else {
-            var whichSetVert; // index of vertex in current triangle set
-            var whichSetTri; // index of triangle in current triangle set
-            var vtxToAdd; // vtx coords to add to the coord array
-            var normToAdd; // vtx normal to add to the coord array
-
-            var uvToAdd; // vtx uv coords to add to the coord array
-
-            var triToAdd; // tri indices to add to the index array
-            var maxCorner = vec3.fromValues(Number.MIN_VALUE,Number.MIN_VALUE,Number.MIN_VALUE); // bbox corner
-            var minCorner = vec3.fromValues(Number.MAX_VALUE,Number.MAX_VALUE,Number.MAX_VALUE); // other corner
+        if (numLongSteps % 2 != 0)
+            throw "in makeSphere: uneven number of longitude steps!";
+        else if (numLongSteps < 4)
+            throw "in makeSphere: number of longitude steps too small!";
+        else { // good number longitude steps
         
-            // process each triangle set to load webgl vertex and triangle buffers
-            numTriangleSets = inputTriangles.length; // remember how many tri sets
-            for (var whichSet=0; whichSet<numTriangleSets; whichSet++) { // for each tri set
-                
-                // set up hilighting, modeling translation and rotation
-                inputTriangles[whichSet].center = vec3.fromValues(0,0,0);  // center point of tri set
-                inputTriangles[whichSet].on = false; // not highlighted
-                inputTriangles[whichSet].translation = vec3.fromValues(0,0,0); // no translation
-                inputTriangles[whichSet].xAxis = vec3.fromValues(1,0,0); // model X axis
-                inputTriangles[whichSet].yAxis = vec3.fromValues(0,1,0); // model Y axis 
+            var sphereVertices = [];
+            var sphereUVs = [];
+            // make vertices and normals
+            for (var latNumber = 0; latNumber <= numLongSteps; latNumber++) {
+              var theta = latNumber * Math.PI / numLongSteps;
+              var sinTheta = Math.sin(theta);
+              var cosTheta = Math.cos(theta);
 
-                if (!inputTriangles[whichSet].material.texture) {
-                    inputTriangles[whichSet].material.glTexture = defaultTexture;
-                } else {
-                    textureLoaders.push(
-                        loadTexture(inputTriangles[whichSet].material, INPUT_DIR + inputTriangles[whichSet].material.texture)
-                    );
-                }
+              for (var longNumber = 0; longNumber <= numLongSteps; longNumber++) {
+                var phi = longNumber * 2 * Math.PI / numLongSteps;
+                var sinPhi = Math.sin(phi);
+                var cosPhi = Math.cos(phi);
 
-                // set up the vertex and normal arrays, define model center and axes
-                inputTriangles[whichSet].glVertices = []; // flat coord list for webgl
-                inputTriangles[whichSet].glNormals = []; // flat normal list for webgl
-                inputTriangles[whichSet].glTextureCoords = []; // flat uv list for webgl
-                var numVerts = inputTriangles[whichSet].vertices.length; // num vertices in tri set
-                for (whichSetVert=0; whichSetVert<numVerts; whichSetVert++) { // verts in set
-                    vtxToAdd = inputTriangles[whichSet].vertices[whichSetVert]; // get vertex to add
-                    normToAdd = inputTriangles[whichSet].normals[whichSetVert]; // get normal to add
-                    uvToAdd = inputTriangles[whichSet].uvs[whichSetVert];
-                    inputTriangles[whichSet].glVertices.push(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]); // put coords in set coord list
-                    inputTriangles[whichSet].glNormals.push(normToAdd[0],normToAdd[1],normToAdd[2]); // put normal in set coord list
-                    inputTriangles[whichSet].glTextureCoords.push(uvToAdd[0], 1.0 - uvToAdd[1]); // put uv coords in flat list
-                    vec3.max(maxCorner,maxCorner,vtxToAdd); // update world bounding box corner maxima
-                    vec3.min(minCorner,minCorner,vtxToAdd); // update world bounding box corner minima
-                    vec3.add(inputTriangles[whichSet].center,inputTriangles[whichSet].center,vtxToAdd); // add to ctr sum
-                } // end for vertices in set
-                vec3.scale(inputTriangles[whichSet].center, inputTriangles[whichSet].center, 1/numVerts); // avg ctr sum
+                var x = cosPhi * sinTheta;
+                var y = cosTheta;
+                var z = sinPhi * sinTheta;
+                var u = (longNumber / numLongSteps);
+                var v = (latNumber / numLongSteps);
 
-                // send the vertex coords and normals to webGL
-                vertexBuffers[whichSet] = gl.createBuffer(); // init empty webgl set vertex coord buffer
-                gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichSet]); // activate that buffer
-                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(inputTriangles[whichSet].glVertices),gl.STATIC_DRAW); // data in
-                normalBuffers[whichSet] = gl.createBuffer(); // init empty webgl set normal component buffer
-                gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichSet]); // activate that buffer
-                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(inputTriangles[whichSet].glNormals),gl.STATIC_DRAW); // data in
-            
-                uvBuffers[whichSet] = gl.createBuffer();
-                gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[whichSet]);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(inputTriangles[whichSet].glTextureCoords), gl.STATIC_DRAW);
+                sphereUVs.push(u, v);
+                sphereVertices.push(x, y, z);
+              }
+            }
+            var sphereNormals = sphereVertices.slice(); // for this sphere, vertices = normals; return these
 
-                // set up the triangle index array, adjusting indices across sets
-                inputTriangles[whichSet].glTriangles = []; // flat index list for webgl
-                triSetSizes[whichSet] = inputTriangles[whichSet].triangles.length; // number of tris in this set
-                for (whichSetTri=0; whichSetTri<triSetSizes[whichSet]; whichSetTri++) {
-                    triToAdd = inputTriangles[whichSet].triangles[whichSetTri]; // get tri to add
-                    inputTriangles[whichSet].glTriangles.push(triToAdd[0],triToAdd[1],triToAdd[2]); // put indices in set list
-                } // end for triangles in set
+            // make triangles, from south pole to middle latitudes to north pole
+            var sphereTriangles = []; // triangles to return
+            for (var latNumber = 0; latNumber < numLongSteps; latNumber++) {
+              for (var longNumber = 0; longNumber < numLongSteps; longNumber++) {
+                var first = (latNumber * (numLongSteps + 1)) + longNumber;
+                var second = first + numLongSteps + 1;
+                sphereTriangles.push(first);
+                sphereTriangles.push(second);
+                sphereTriangles.push(first + 1);
 
-                // send the triangle indices to webGL
-                triangleBuffers.push(gl.createBuffer()); // init empty triangle index buffer
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[whichSet]); // activate that buffer
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(inputTriangles[whichSet].glTriangles),gl.STATIC_DRAW); // data in
-
-            } // end for each triangle set 
-        
-            inputSpheres = getJSONFile(INPUT_SPHERES_URL,"spheres"); // read in the sphere data
-
-            if (inputSpheres == String.null)
-                throw "Unable to load spheres file!";
-            else {
-                
-                // init sphere highlighting, translation and rotation; update bbox
-                var sphere; // current sphere
-                var temp = vec3.create(); // an intermediate vec3
-                var minXYZ = vec3.create(), maxXYZ = vec3.create();  // min/max xyz from sphere
-                numSpheres = inputSpheres.length; // remember how many spheres
-                for (var whichSphere=0; whichSphere<numSpheres; whichSphere++) {
-                    sphere = inputSpheres[whichSphere];
-                    sphere.on = false; // spheres begin without highlight
-                    sphere.translation = vec3.fromValues(0,0,0); // spheres begin without translation
-                    sphere.xAxis = vec3.fromValues(1,0,0); // sphere X axis
-                    sphere.yAxis = vec3.fromValues(0,1,0); // sphere Y axis
-                    sphere.center = vec3.fromValues(0,0,0); // sphere instance is at origin
-                    vec3.set(minXYZ,sphere.x-sphere.r,sphere.y-sphere.r,sphere.z-sphere.r);
-                    vec3.set(maxXYZ,sphere.x+sphere.r,sphere.y+sphere.r,sphere.z+sphere.r);
-                    vec3.min(minCorner,minCorner,minXYZ); // update world bbox min corner
-                    vec3.max(maxCorner,maxCorner,maxXYZ); // update world bbox max corner
-
-                    if (!sphere.texture) {
-                        sphere.glTexture = defaultTexture;
-                    } else {
-                        textureLoaders.push(
-                            loadTexture(sphere, INPUT_DIR + sphere.texture)
-                        );
-                    }
-                } // end for each sphere
-                viewDelta = vec3.length(vec3.subtract(temp,maxCorner,minCorner)) / 100; // set global
-
-                // make one sphere instance that will be reused
-                var oneSphere = makeSphere(64);
-
-                // send the sphere vertex coords and normals to webGL
-                vertexBuffers.push(gl.createBuffer()); // init empty webgl sphere vertex coord buffer
-                gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[vertexBuffers.length-1]); // activate that buffer
-                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(oneSphere.vertices),gl.STATIC_DRAW); // data in
-                normalBuffers.push(gl.createBuffer()); // init empty webgl sphere vertex normal buffer
-                gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[normalBuffers.length-1]); // activate that buffer
-                gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(oneSphere.normals),gl.STATIC_DRAW); // data in
-        
-                uvBuffers.push(gl.createBuffer());
-                gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[uvBuffers.length - 1]);
-                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(oneSphere.uvs), gl.STATIC_DRAW);
-
-                triSetSizes.push(oneSphere.triangles.length);
-
-                // send the triangle indices to webGL
-                triangleBuffers.push(gl.createBuffer()); // init empty triangle index buffer
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[triangleBuffers.length-1]); // activate that buffer
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(oneSphere.triangles),gl.STATIC_DRAW); // data in
-            } // end if sphere file loaded
-        } // end if triangle file loaded
-    } // end try 
+                sphereTriangles.push(second);
+                sphereTriangles.push(second + 1);
+                sphereTriangles.push(first + 1);
+              }
+            }
+            return({vertices:sphereVertices, normals:sphereNormals, triangles:sphereTriangles, uvs: sphereUVs});
+        } // end if good number longitude steps
+    } // end try
     
     catch(e) {
         console.log(e);
     } // end catch
-} // end load models
+} // end make sphere
+
+function loadTriangles(data) {
+    inputTriangles = JSON.parse(data);
+
+    var whichSetVert; // index of vertex in current triangle set
+    var whichSetTri; // index of triangle in current triangle set
+    var vtxToAdd; // vtx coords to add to the coord array
+    var normToAdd; // vtx normal to add to the coord array
+
+    var uvToAdd; // vtx uv coords to add to the coord array
+
+    var triToAdd; // tri indices to add to the index array
+
+    // process each triangle set to load webgl vertex and triangle buffers
+    numTriangleSets = inputTriangles.length; // remember how many tri sets
+    for (var whichSet=0; whichSet<numTriangleSets; whichSet++) { // for each tri set
+        
+        // set up hilighting, modeling translation and rotation
+        inputTriangles[whichSet].center = vec3.fromValues(0,0,0);  // center point of tri set
+        inputTriangles[whichSet].on = false; // not highlighted
+        inputTriangles[whichSet].translation = vec3.fromValues(0,0,0); // no translation
+        inputTriangles[whichSet].xAxis = vec3.fromValues(1,0,0); // model X axis
+        inputTriangles[whichSet].yAxis = vec3.fromValues(0,1,0); // model Y axis 
+
+        if (!inputTriangles[whichSet].material.texture) {
+            inputTriangles[whichSet].material.glTexture = defaultTexture;
+        } else {
+            textureLoaders.push(
+                loadTexture(inputTriangles[whichSet].material, INPUT_DIR + inputTriangles[whichSet].material.texture)
+            );
+        }
+
+        // set up the vertex and normal arrays, define model center and axes
+        inputTriangles[whichSet].glVertices = []; // flat coord list for webgl
+        inputTriangles[whichSet].glNormals = []; // flat normal list for webgl
+        inputTriangles[whichSet].glTextureCoords = []; // flat uv list for webgl
+        var numVerts = inputTriangles[whichSet].vertices.length; // num vertices in tri set
+        for (whichSetVert=0; whichSetVert<numVerts; whichSetVert++) { // verts in set
+            vtxToAdd = inputTriangles[whichSet].vertices[whichSetVert]; // get vertex to add
+            normToAdd = inputTriangles[whichSet].normals[whichSetVert]; // get normal to add
+            uvToAdd = inputTriangles[whichSet].uvs[whichSetVert];
+            inputTriangles[whichSet].glVertices.push(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]); // put coords in set coord list
+            inputTriangles[whichSet].glNormals.push(normToAdd[0],normToAdd[1],normToAdd[2]); // put normal in set coord list
+            inputTriangles[whichSet].glTextureCoords.push(uvToAdd[0], 1.0 - uvToAdd[1]); // put uv coords in flat list
+            vec3.max(maxCorner,maxCorner,vtxToAdd); // update world bounding box corner maxima
+            vec3.min(minCorner,minCorner,vtxToAdd); // update world bounding box corner minima
+            vec3.add(inputTriangles[whichSet].center,inputTriangles[whichSet].center,vtxToAdd); // add to ctr sum
+        } // end for vertices in set
+        vec3.scale(inputTriangles[whichSet].center, inputTriangles[whichSet].center, 1/numVerts); // avg ctr sum
+
+        // send the vertex coords and normals to webGL
+        vertexBuffers[whichSet] = gl.createBuffer(); // init empty webgl set vertex coord buffer
+        gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichSet]); // activate that buffer
+        gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(inputTriangles[whichSet].glVertices),gl.STATIC_DRAW); // data in
+        normalBuffers[whichSet] = gl.createBuffer(); // init empty webgl set normal component buffer
+        gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichSet]); // activate that buffer
+        gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(inputTriangles[whichSet].glNormals),gl.STATIC_DRAW); // data in
+    
+        uvBuffers[whichSet] = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[whichSet]);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(inputTriangles[whichSet].glTextureCoords), gl.STATIC_DRAW);
+
+        // set up the triangle index array, adjusting indices across sets
+        inputTriangles[whichSet].glTriangles = []; // flat index list for webgl
+        triSetSizes[whichSet] = inputTriangles[whichSet].triangles.length; // number of tris in this set
+        for (whichSetTri=0; whichSetTri<triSetSizes[whichSet]; whichSetTri++) {
+            triToAdd = inputTriangles[whichSet].triangles[whichSetTri]; // get tri to add
+            inputTriangles[whichSet].glTriangles.push(triToAdd[0],triToAdd[1],triToAdd[2]); // put indices in set list
+        } // end for triangles in set
+
+        // send the triangle indices to webGL
+        triangleBuffers.push(gl.createBuffer()); // init empty triangle index buffer
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[whichSet]); // activate that buffer
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(inputTriangles[whichSet].glTriangles),gl.STATIC_DRAW); // data in
+
+    } // end for each triangle set 
+    return loadResource(INPUT_SPHERES_URL);
+}
+
+function loadSpheres(data) {
+    inputSpheres = JSON.parse(data);
+
+    // init sphere highlighting, translation and rotation; update bbox
+    var sphere; // current sphere
+    var temp = vec3.create(); // an intermediate vec3
+    var minXYZ = vec3.create(), maxXYZ = vec3.create();  // min/max xyz from sphere
+    numSpheres = inputSpheres.length; // remember how many spheres
+    for (var whichSphere=0; whichSphere<numSpheres; whichSphere++) {
+        sphere = inputSpheres[whichSphere];
+        sphere.on = false; // spheres begin without highlight
+        sphere.translation = vec3.fromValues(0,0,0); // spheres begin without translation
+        sphere.xAxis = vec3.fromValues(1,0,0); // sphere X axis
+        sphere.yAxis = vec3.fromValues(0,1,0); // sphere Y axis
+        sphere.center = vec3.fromValues(0,0,0); // sphere instance is at origin
+        vec3.set(minXYZ,sphere.x-sphere.r,sphere.y-sphere.r,sphere.z-sphere.r);
+        vec3.set(maxXYZ,sphere.x+sphere.r,sphere.y+sphere.r,sphere.z+sphere.r);
+        vec3.min(minCorner,minCorner,minXYZ); // update world bbox min corner
+        vec3.max(maxCorner,maxCorner,maxXYZ); // update world bbox max corner
+
+        if (!sphere.texture) {
+            sphere.glTexture = defaultTexture;
+        } else {
+            textureLoaders.push(
+                loadTexture(sphere, INPUT_DIR + sphere.texture)
+            );
+        }
+    } // end for each sphere
+    viewDelta = vec3.length(vec3.subtract(temp,maxCorner,minCorner)) / 100; // set global
+
+    // make one sphere instance that will be reused
+    var oneSphere = makeSphere(64);
+
+    // send the sphere vertex coords and normals to webGL
+    vertexBuffers.push(gl.createBuffer()); // init empty webgl sphere vertex coord buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[vertexBuffers.length-1]); // activate that buffer
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(oneSphere.vertices),gl.STATIC_DRAW); // data in
+    normalBuffers.push(gl.createBuffer()); // init empty webgl sphere vertex normal buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[normalBuffers.length-1]); // activate that buffer
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(oneSphere.normals),gl.STATIC_DRAW); // data in
+
+    uvBuffers.push(gl.createBuffer());
+    gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[uvBuffers.length - 1]);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(oneSphere.uvs), gl.STATIC_DRAW);
+
+    triSetSizes.push(oneSphere.triangles.length);
+
+    // send the triangle indices to webGL
+    triangleBuffers.push(gl.createBuffer()); // init empty triangle index buffer
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[triangleBuffers.length-1]); // activate that buffer
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(oneSphere.triangles),gl.STATIC_DRAW); // data in
+    return Promise.all(textureLoaders);
+}
 
 // setup the webGL shaders
 function setupShaders() {
@@ -850,16 +817,18 @@ function main() {
 
   function init() {
     setupWebGL(); // set up the webGL environment
-    loadModels(); // load models' triangle data into buffers
     setupShaders(); // setup the webGL shaders
 
-    Promise.all(textureLoaders).then(function (success) {
-        console.log("start");
-        start = performance.now();
-        loop(start);
-    }).catch(function (err) {
-        console.log(err);
-    });
+    defaultTexture = createSolidTexture(255, 255, 255, 255);
+    loadResource(INPUT_TRIANGLES_URL)
+        .then(loadTriangles)
+        .then(loadSpheres)
+        .then(function (success) {
+            start = performance.now();
+            loop(start);
+        }).catch(function (err) {
+            console.log("Failed to load: " + err);
+        });
   }
 
   init();
@@ -873,42 +842,5 @@ function main() {
   //   }
   //   return loadResource(INPUT_SPHERES_URL);
   // }
-
-  // function loadSpheres(data) {
-  //   var rawSpheres = JSON.parse(data);
-  //   var sphere;
-  //   for (var i = 0; i < rawSpheres.length; i++) {
-  //     sphere = Sphere(rawSpheres[i], 32, 32);
-  //     models.push(sphere.model);
-  //     //console.log(rawSphere.model);
-  //     spheres.push(sphere.model);
-  //   }
-  //   spherePtr = 0;
-
-  //   return loadResource(INPUT_TRIANGLES_URL);
-  // }
-
-  // function loadTriangles(data) {
-  //   var rawTriangles = JSON.parse(data);
-  //   var model;
-  //   for (var i = 0; i < rawTriangles.length; i++) {
-  //     model = Model(rawTriangles[i]);
-  //     model.material.shininess = model.material.n;
-  //     delete model.material.n;
-  //     models.push(model);
-  //     triangles.push(model);
-  //   }
-  //   trianglePtr = 0;
-
-  //   init();
-  // }
-
-  // loadResource(INPUT_LIGHTS_URL)
-  //   .then(loadLights)
-  //   .then(loadSpheres)
-  //   .then(loadTriangles)
-  // .catch(function (err) {
-  //   console.error(err);
-  // });
   
 } // end main
