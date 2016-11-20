@@ -1,7 +1,15 @@
+/**
+ * program 3
+ * author: Hayden Fuss <whfuss@ncsu.edu>
+ * date: 11/19/2016
+ * adapted from Dr. Watson's shell
+ */
+
 /* GLOBAL CONSTANTS AND VARIABLES */
 
 /* assignment specific globals */
 const INPUT_DIR = "https://ncsucgclass.github.io/prog3/";
+// const INPUT_DIR = "/data/";
 const INPUT_TRIANGLES_URL = INPUT_DIR + "triangles.json"; // triangles file loc
 const INPUT_SPHERES_URL = INPUT_DIR + "spheres.json"; // spheres file loc
 var defaultEye = vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
@@ -13,10 +21,9 @@ var lightSpecular = vec3.fromValues(1,1,1); // default light specular emission
 var lightPosition = vec3.fromValues(2,4,-0.5); // default light position
 var rotateTheta = Math.PI/50; // how much to rotate models by with each key press
 
-var defaultTexture = null;
+var defaultTexture = null; // blank texture for non-textured objects
 var maxCorner = vec3.fromValues(Number.MIN_VALUE,Number.MIN_VALUE,Number.MIN_VALUE); // bbox corner
 var minCorner = vec3.fromValues(Number.MAX_VALUE,Number.MAX_VALUE,Number.MAX_VALUE); // other corner
-
 
 /* webgl and geometry data */
 var gl = null; // the all powerful gl object. It's all here folks!
@@ -31,7 +38,7 @@ var triSetSizes = []; // this contains the size of each triangle set
 var triangleBuffers = []; // lists of indices into vertexBuffers by set, in triples
 var viewDelta = 0; // how much to displace view with each key press
 
-var textureLoaders = [];
+var textureLoaders = []; // list of promises for loading textures
 
 var opaqueObjects = {
     triangles: [],
@@ -52,16 +59,17 @@ var shininessULoc; // where to put specular exponent for fragment shader
 var mMatrixULoc; // where to put model matrix for vertex shader
 var pvmMatrixULoc; // where to put project model view matrix for vertex shader
 
-var textureULoc;
-var vTextCoordAttribLoc;
-var alphaULoc;
+var textureULoc; // texture ptr
+var vTextCoordAttribLoc; // uv ptr
+var alphaULoc; // alpha ptr
 
 /* interaction variables */
 var Eye = vec3.clone(defaultEye); // eye position in world space
 var Center = vec3.clone(defaultCenter); // view direction in world space
 var Up = vec3.clone(defaultUp); // view up vector in world space
 
-// ASSIGNMENT HELPER FUNCTION
+// ASSIGNMENT HELPER FUNCTIONS
+// used for loading JSON files and other resources
 // helpful source for promisifying http request:
 // http://stackoverflow.com/questions/30008114/how-do-i-promisify-native-xhr
 function loadResource(url) {
@@ -90,19 +98,42 @@ function loadResource(url) {
     });
 }
 
+// used for loading images to be used as textures
 function loadTexture(obj, url) {
     return new Promise(function(resolve, reject) {
         obj.glTexture = gl.createTexture();
         obj.img = new Image();
-        obj.img.crossOrigin = "Anonymous";
+        obj.img.crossOrigin = "anonymous";
         obj.img.onload = function () {
               console.log(url);
+              // test if the image has a transparent pixel using imgData
+              var canvas = document.createElement("canvas");
+              var ctx = canvas.getContext("2d");
+
+              canvas.width = obj.img.width;
+              canvas.height = obj.img.height;
+
+              ctx.drawImage(obj.img, 0, 0);
+              var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+              obj.isTranslucentTexture = false;
+              for (var i = 0; i < imgData.length; i+=4) {
+                if (imgData[i + 3] < 255) {
+                    obj.isTranslucentTexture = true;
+                    break;
+                }
+              }
+
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              delete canvas;
+              delete ctx;
+
               gl.bindTexture(gl.TEXTURE_2D, obj.glTexture);
               gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, obj.img);
               gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
               gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
               gl.generateMipmap(gl.TEXTURE_2D);
               gl.bindTexture(gl.TEXTURE_2D, null);
+
               resolve(true);
         };
         obj.img.onerror = function() {
@@ -112,6 +143,7 @@ function loadTexture(obj, url) {
     });
 }
 
+// creates a "texture" of a solid color. used to create the blank, default texture
 function createSolidTexture(r, g, b, a) {
     var data = new Uint8Array([r, g, b, a]);
     var texture = gl.createTexture();
@@ -123,6 +155,7 @@ function createSolidTexture(r, g, b, a) {
     return texture;
 }
 
+// Dr. Watson's -- didn't really touch this
 // does stuff when keys are pressed
 function handleKeyDown(event) {
     // TODO add delta time to make smoother motion
@@ -296,7 +329,7 @@ function setupWebGL() {
     // Set up keys
     document.onkeydown = handleKeyDown; // call this when key pressed
 
-    textureLoaders.push(
+    textureLoaders.push( // make it a promise so we can wait on it with all other images
         new Promise(function(resolve, reject) {
             // Get the image canvas, render an image in it
             var imageCanvas = document.getElementById("myImageCanvas"); // create a 2d canvas
@@ -326,7 +359,6 @@ function setupWebGL() {
         gl.clearColor(0.0, 0.0, 0.0, 1.0); // use black when we clear the frame buffer
         gl.clearDepth(1.0); // use max when we clear the depth buffer
         gl.enable(gl.DEPTH_TEST); // use hidden surface removal (with zbuffering)
-        // TODO toggle z-buffering for transparent objects
       }
     } // end try
 
@@ -342,14 +374,14 @@ function setupShaders() {
     var vShaderCode = `
         attribute vec3 aVertexPosition; // vertex position
         attribute vec3 aVertexNormal; // vertex normal
-        attribute vec2 aVertexTextureCoords;
+        attribute vec2 aVertexTextureCoords; // vertex uv
 
         uniform mat4 umMatrix; // the model matrix
         uniform mat4 upvmMatrix; // the project view model matrix
 
         varying vec3 vWorldPos; // interpolated world position of vertex
         varying vec3 vVertexNormal; // interpolated normal for frag shader
-        varying highp vec2 vTextureCoords;
+        varying highp vec2 vTextureCoords; // interpolated uv
 
         void main(void) {
 
@@ -389,9 +421,9 @@ function setupShaders() {
         varying vec3 vWorldPos; // world xyz of fragment
         varying vec3 vVertexNormal; // normal of fragment
 
-        varying highp vec2 vTextureCoords;
-        uniform sampler2D uTexture;
-        uniform float uAlpha;
+        varying highp vec2 vTextureCoords; // interpolated uv
+        uniform sampler2D uTexture; // texture sampler
+        uniform float uAlpha; // material alpha
 
         void main(void) {
 
@@ -484,6 +516,7 @@ function setupShaders() {
     } // end catch
 } // end setup shaders
 
+// edited this to use my sphere lat/long function -- easier to generate uvs
 // make a sphere with radius 1 at the origin, with numLongSteps longitudes.
 // Returns verts, tris and normals.
 function makeSphere(numLongSteps) {
@@ -543,6 +576,7 @@ function makeSphere(numLongSteps) {
     } // end catch
 } // end make sphere
 
+// extract triangles from json file
 function loadTriangles(data) {
     inputTriangles = JSON.parse(data);
 
@@ -566,8 +600,10 @@ function loadTriangles(data) {
         inputTriangles[whichSet].xAxis = vec3.fromValues(1,0,0); // model X axis
         inputTriangles[whichSet].yAxis = vec3.fromValues(0,1,0); // model Y axis
 
+        // if no texture use default, else load it
         if (!inputTriangles[whichSet].material.texture) {
             inputTriangles[whichSet].material.glTexture = defaultTexture;
+            inputTriangles[whichSet].material.isTranslucentTexture = false;
         } else {
             textureLoaders.push(
                 loadTexture(inputTriangles[whichSet].material, INPUT_DIR + inputTriangles[whichSet].material.texture)
@@ -616,16 +652,12 @@ function loadTriangles(data) {
         triangleBuffers.push(gl.createBuffer()); // init empty triangle index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[whichSet]); // activate that buffer
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(inputTriangles[whichSet].glTriangles),gl.STATIC_DRAW); // data in
-
-        if (inputTriangles[whichSet].material.alpha != 1.0) {
-            translucentObjects.triangles.push(whichSet);
-        } else {
-            opaqueObjects.triangles.push(whichSet);
-        }
     } // end for each triangle set
-    return loadResource(INPUT_SPHERES_URL);
+
+    return loadResource(INPUT_SPHERES_URL); // now load the spheres next
 }
 
+// extract spheres from json file and generate single sphere model
 function loadSpheres(data) {
     inputSpheres = JSON.parse(data);
 
@@ -646,18 +678,14 @@ function loadSpheres(data) {
         vec3.min(minCorner,minCorner,minXYZ); // update world bbox min corner
         vec3.max(maxCorner,maxCorner,maxXYZ); // update world bbox max corner
 
+        // if no texture use default, else load it
         if (!sphere.texture) {
             sphere.glTexture = defaultTexture;
+            sphere.isTranslucentTexture = false;
         } else {
             textureLoaders.push(
                 loadTexture(sphere, INPUT_DIR + sphere.texture)
             );
-        }
-
-        if (sphere.alpha != 1.0) {
-            translucentObjects.spheres.push(whichSphere);
-        } else {
-            opaqueObjects.spheres.push(whichSphere);
         }
     } // end for each sphere
     viewDelta = vec3.length(vec3.subtract(temp,maxCorner,minCorner)) / 100; // set global
@@ -684,7 +712,7 @@ function loadSpheres(data) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffers[triangleBuffers.length-1]); // activate that buffer
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(oneSphere.triangles),gl.STATIC_DRAW); // data in
 
-    return Promise.all(textureLoaders);
+    return Promise.all(textureLoaders); // now load all the remaining textures
 }
 
 // render the loaded model
@@ -715,9 +743,8 @@ function renderModels(dt) {
     var hpvmMatrix = mat4.create(); // hand * proj * view * model matrices
     const highlightMaterial = {ambient:[0.5,0.5,0], diffuse:[0.5,0.5,0], specular:[0,0,0], n:1, glTexture: defaultTexture, alpha: 1.0}; // hlht mat
 
-    // window.requestAnimationFrame(renderModels); // set up frame render callbacks
-
     gl.clear(/*gl.COLOR_BUFFER_BIT |*/ gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
+    // color buffer removes star background, can be helpful
 
     // set up handedness, projection and view
     mat4.fromScaling(hMatrix,vec3.fromValues(-1,1,1)); // create handedness matrix
@@ -726,182 +753,109 @@ function renderModels(dt) {
     mat4.multiply(hpvMatrix,hMatrix,pMatrix); // handedness * projection
     mat4.multiply(hpvMatrix,hpvMatrix,vMatrix); // handedness * projection * view
 
-    gl.enable(gl.DEPTH_TEST);
-    gl.disable(gl.BLEND);
-    var whichSet;
-    for (var tI = 0; tI < opaqueObjects.triangles.length; tI++) {
-        whichSet = opaqueObjects.triangles[tI];
-        currSet = inputTriangles[whichSet];
+    // draws a list of spheres then triangles
+    function drawObjects(objects) {
+        // render each sphere
+        var sphere, currentMaterial, instanceTransform = mat4.create(); // the current sphere and material
+        gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[vertexBuffers.length-1]); // activate vertex buffer
+        gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed vertex buffer to shader
+        gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[normalBuffers.length-1]); // activate normal buffer
+        gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed normal buffer to shader
 
-        // make model transform, add to view project
-        makeModelTransform(currSet);
-        mat4.multiply(hpvmMatrix,hpvMatrix,mMatrix); // handedness * project * view * model
-        gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in the m matrix
-        gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix); // pass in the hpvm matrix
-
-        // reflectivity: feed to the fragment shader
-        if (currSet.on)
-            setMaterial = highlightMaterial; // highlight material
-        else
-            setMaterial = currSet.material; // normal material
-        gl.uniform3fv(ambientULoc,setMaterial.ambient); // pass in the ambient reflectivity
-        gl.uniform3fv(diffuseULoc,setMaterial.diffuse); // pass in the diffuse reflectivity
-        gl.uniform3fv(specularULoc,setMaterial.specular); // pass in the specular reflectivity
-        gl.uniform1f(shininessULoc,setMaterial.n); // pass in the specular exponent
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, setMaterial.glTexture);
-        gl.uniform1i(textureULoc, 0);
-
-        gl.uniform1f(alphaULoc, setMaterial.alpha);
-
-        // vertex buffer: activate and feed into vertex shader
-        gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichSet]); // activate
-        gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed
-        gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichSet]); // activate
-        gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[whichSet]);
+        gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[uvBuffers.length - 1]);
         gl.vertexAttribPointer(vTextCoordAttribLoc, 2, gl.FLOAT, false, 0, 0);
 
-        // triangle buffer: activate and render
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[whichSet]); // activate
-        gl.drawElements(gl.TRIANGLES,3*triSetSizes[whichSet],gl.UNSIGNED_SHORT,0); // render
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[triangleBuffers.length-1]); // activate tri buffer
+        for (var sI = 0; sI < objects.spheres.length; sI++) {
+            sphere = inputSpheres[objects.spheres[sI]];
+
+            // define model transform, premult with pvmMatrix, feed to shader
+            makeModelTransform(sphere);
+            mat4.fromTranslation(instanceTransform,vec3.fromValues(sphere.x,sphere.y,sphere.z)); // recenter sphere
+            mat4.scale(mMatrix,mMatrix,vec3.fromValues(sphere.r,sphere.r,sphere.r)); // change size
+            mat4.multiply(mMatrix,instanceTransform,mMatrix); // apply recenter sphere
+            hpvmMatrix = mat4.multiply(hpvmMatrix,hpvMatrix,mMatrix); // premultiply with hpv matrix
+            gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in model matrix
+            gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix); // pass in handed project view model matrix
+
+            // reflectivity: feed to the fragment shader
+            if (sphere.on)
+                currentMaterial = highlightMaterial;
+            else
+                currentMaterial = sphere;
+            gl.uniform3fv(ambientULoc,currentMaterial.ambient); // pass in the ambient reflectivity
+            gl.uniform3fv(diffuseULoc,currentMaterial.diffuse); // pass in the diffuse reflectivity
+            gl.uniform3fv(specularULoc,currentMaterial.specular); // pass in the specular reflectivity
+            gl.uniform1f(shininessULoc,currentMaterial.n); // pass in the specular exponent
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, currentMaterial.glTexture);
+            gl.uniform1i(textureULoc, 0);
+
+            gl.uniform1f(alphaULoc, currentMaterial.alpha);
+
+            // draw a transformed instance of the sphere
+            gl.drawElements(gl.TRIANGLES,triSetSizes[triSetSizes.length-1],gl.UNSIGNED_SHORT,0); // render
+        }
+
+        var whichSet;
+        for (var tI = 0; tI < objects.triangles.length; tI++) {
+            whichSet = objects.triangles[tI]
+            currSet = inputTriangles[whichSet];
+
+            // make model transform, add to view project
+            makeModelTransform(currSet);
+            mat4.multiply(hpvmMatrix,hpvMatrix,mMatrix); // handedness * project * view * model
+            gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in the m matrix
+            gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix); // pass in the hpvm matrix
+
+            // reflectivity: feed to the fragment shader
+            if (currSet.on)
+                setMaterial = highlightMaterial; // highlight material
+            else
+                setMaterial = currSet.material; // normal material
+            gl.uniform3fv(ambientULoc,setMaterial.ambient); // pass in the ambient reflectivity
+            gl.uniform3fv(diffuseULoc,setMaterial.diffuse); // pass in the diffuse reflectivity
+            gl.uniform3fv(specularULoc,setMaterial.specular); // pass in the specular reflectivity
+            gl.uniform1f(shininessULoc,setMaterial.n); // pass in the specular exponent
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, setMaterial.glTexture);
+            gl.uniform1i(textureULoc, 0);
+
+            gl.uniform1f(alphaULoc, setMaterial.alpha);
+
+            // vertex buffer: activate and feed into vertex shader
+            gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichSet]); // activate
+            gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed
+            gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichSet]); // activate
+            gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[whichSet]);
+            gl.vertexAttribPointer(vTextCoordAttribLoc, 2, gl.FLOAT, false, 0, 0);
+
+            // triangle buffer: activate and render
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[whichSet]); // activate
+            gl.drawElements(gl.TRIANGLES,3*triSetSizes[whichSet],gl.UNSIGNED_SHORT,0); // render
+        }
     }
 
-    // render each sphere
-    var sphere, currentMaterial, instanceTransform = mat4.create(); // the current sphere and material
-    gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[vertexBuffers.length-1]); // activate vertex buffer
-    gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed vertex buffer to shader
-    gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[normalBuffers.length-1]); // activate normal buffer
-    gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed normal buffer to shader
+    // draw opaque objects
+    gl.depthMask(true); // z-buffer on
+    gl.disable(gl.BLEND); // blend off
+    drawObjects(opaqueObjects);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[uvBuffers.length - 1]);
-    gl.vertexAttribPointer(vTextCoordAttribLoc, 2, gl.FLOAT, false, 0, 0);
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[triangleBuffers.length-1]); // activate tri buffer
-    for (var sI = 0; sI < opaqueObjects.spheres.length; sI++) {
-        sphere = inputSpheres[opaqueObjects.spheres[sI]];
-
-        // define model transform, premult with pvmMatrix, feed to shader
-        makeModelTransform(sphere);
-        mat4.fromTranslation(instanceTransform,vec3.fromValues(sphere.x,sphere.y,sphere.z)); // recenter sphere
-        mat4.scale(mMatrix,mMatrix,vec3.fromValues(sphere.r,sphere.r,sphere.r)); // change size
-        mat4.multiply(mMatrix,instanceTransform,mMatrix); // apply recenter sphere
-        hpvmMatrix = mat4.multiply(hpvmMatrix,hpvMatrix,mMatrix); // premultiply with hpv matrix
-        gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in model matrix
-        gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix); // pass in handed project view model matrix
-
-        // reflectivity: feed to the fragment shader
-        if (sphere.on)
-            currentMaterial = highlightMaterial;
-        else
-            currentMaterial = sphere;
-        gl.uniform3fv(ambientULoc,currentMaterial.ambient); // pass in the ambient reflectivity
-        gl.uniform3fv(diffuseULoc,currentMaterial.diffuse); // pass in the diffuse reflectivity
-        gl.uniform3fv(specularULoc,currentMaterial.specular); // pass in the specular reflectivity
-        gl.uniform1f(shininessULoc,currentMaterial.n); // pass in the specular exponent
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, currentMaterial.glTexture);
-        gl.uniform1i(textureULoc, 0);
-
-        gl.uniform1f(alphaULoc, currentMaterial.alpha);
-
-        // draw a transformed instance of the sphere
-        gl.drawElements(gl.TRIANGLES,triSetSizes[triSetSizes.length-1],gl.UNSIGNED_SHORT,0); // render
-    }
-
-    gl.disable(gl.DEPTH_TEST);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-    gl.enable(gl.BLEND);
-    // render each sphere
-    gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[vertexBuffers.length-1]); // activate vertex buffer
-    gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed vertex buffer to shader
-    gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[normalBuffers.length-1]); // activate normal buffer
-    gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed normal buffer to shader
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[uvBuffers.length - 1]);
-    gl.vertexAttribPointer(vTextCoordAttribLoc, 2, gl.FLOAT, false, 0, 0);
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[triangleBuffers.length-1]); // activate tri buffer
-    for (var sI = 0; sI < translucentObjects.spheres.length; sI++) {
-        sphere = inputSpheres[translucentObjects.spheres[sI]];
-
-        // define model transform, premult with pvmMatrix, feed to shader
-        makeModelTransform(sphere);
-        mat4.fromTranslation(instanceTransform,vec3.fromValues(sphere.x,sphere.y,sphere.z)); // recenter sphere
-        mat4.scale(mMatrix,mMatrix,vec3.fromValues(sphere.r,sphere.r,sphere.r)); // change size
-        mat4.multiply(mMatrix,instanceTransform,mMatrix); // apply recenter sphere
-        hpvmMatrix = mat4.multiply(hpvmMatrix,hpvMatrix,mMatrix); // premultiply with hpv matrix
-        gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in model matrix
-        gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix); // pass in handed project view model matrix
-
-        // reflectivity: feed to the fragment shader
-        if (sphere.on)
-            currentMaterial = highlightMaterial;
-        else
-            currentMaterial = sphere;
-        gl.uniform3fv(ambientULoc,currentMaterial.ambient); // pass in the ambient reflectivity
-        gl.uniform3fv(diffuseULoc,currentMaterial.diffuse); // pass in the diffuse reflectivity
-        gl.uniform3fv(specularULoc,currentMaterial.specular); // pass in the specular reflectivity
-        gl.uniform1f(shininessULoc,currentMaterial.n); // pass in the specular exponent
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, currentMaterial.glTexture);
-        gl.uniform1i(textureULoc, 0);
-
-        gl.uniform1f(alphaULoc, currentMaterial.alpha);
-
-        // draw a transformed instance of the sphere
-        gl.drawElements(gl.TRIANGLES,triSetSizes[triSetSizes.length-1],gl.UNSIGNED_SHORT,0); // render
-    }
-
-    for (var tI = 0; tI < translucentObjects.triangles.length; tI++) {
-        whichSet = translucentObjects.triangles[tI]
-        currSet = inputTriangles[whichSet];
-
-        // make model transform, add to view project
-        makeModelTransform(currSet);
-        mat4.multiply(hpvmMatrix,hpvMatrix,mMatrix); // handedness * project * view * model
-        gl.uniformMatrix4fv(mMatrixULoc, false, mMatrix); // pass in the m matrix
-        gl.uniformMatrix4fv(pvmMatrixULoc, false, hpvmMatrix); // pass in the hpvm matrix
-
-        // reflectivity: feed to the fragment shader
-        if (currSet.on)
-            setMaterial = highlightMaterial; // highlight material
-        else
-            setMaterial = currSet.material; // normal material
-        gl.uniform3fv(ambientULoc,setMaterial.ambient); // pass in the ambient reflectivity
-        gl.uniform3fv(diffuseULoc,setMaterial.diffuse); // pass in the diffuse reflectivity
-        gl.uniform3fv(specularULoc,setMaterial.specular); // pass in the specular reflectivity
-        gl.uniform1f(shininessULoc,setMaterial.n); // pass in the specular exponent
-
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, setMaterial.glTexture);
-        gl.uniform1i(textureULoc, 0);
-
-        gl.uniform1f(alphaULoc, setMaterial.alpha);
-
-        // vertex buffer: activate and feed into vertex shader
-        gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffers[whichSet]); // activate
-        gl.vertexAttribPointer(vPosAttribLoc,3,gl.FLOAT,false,0,0); // feed
-        gl.bindBuffer(gl.ARRAY_BUFFER,normalBuffers[whichSet]); // activate
-        gl.vertexAttribPointer(vNormAttribLoc,3,gl.FLOAT,false,0,0); // feed
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffers[whichSet]);
-        gl.vertexAttribPointer(vTextCoordAttribLoc, 2, gl.FLOAT, false, 0, 0);
-
-        // triangle buffer: activate and render
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffers[whichSet]); // activate
-        gl.drawElements(gl.TRIANGLES,3*triSetSizes[whichSet],gl.UNSIGNED_SHORT,0); // render
-    }
+    gl.depthMask(false); // z-buffer off
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // set blending function
+    gl.enable(gl.BLEND); // blending on
+    drawObjects(translucentObjects);
 
 } // end render model
 
 /* MAIN -- HERE is where execution begins after window load */
 function main() {
 
+  // "game" loop with dt calculation
   function loop(now) {
     dt = now - start;
     start = now;
@@ -909,6 +863,25 @@ function main() {
     renderModels(dt / 1000);
 
     window.requestAnimationFrame(loop);
+  }
+  
+  // sorts objects into opaque and translucent
+  function categorizeObjects() {
+        for (var whichSet = 0; whichSet < inputTriangles.length; whichSet++) {
+            if (inputTriangles[whichSet].material.alpha != 1.0 || inputTriangles[whichSet].material.isTranslucentTexture) {
+                translucentObjects.triangles.push(whichSet);
+            } else {
+                opaqueObjects.triangles.push(whichSet);
+            }
+        }
+
+        for (var whichSet = 0; whichSet < inputSpheres.length; whichSet++) {
+            if (inputSpheres[whichSet].alpha != 1.0 || inputSpheres[whichSet].isTranslucentTexture) {
+                translucentObjects.spheres.push(whichSet);
+            } else {
+                opaqueObjects.spheres.push(whichSet);
+            }
+        }
   }
 
   function init() {
@@ -920,23 +893,17 @@ function main() {
         .then(loadTriangles)
         .then(loadSpheres)
         .then(function (success) {
+            categorizeObjects(); // sort objects
+            console.log(translucentObjects);
+            console.log(opaqueObjects);
+
             start = performance.now();
-            loop(start);
+            loop(start); // start looping
         }).catch(function (err) {
             console.log("Failed to load: " + err);
         });
   }
 
   init();
-
-  // function loadLights(data) {
-  //   var rawLights = JSON.parse(data);
-  //   var light;
-  //   for (var i = 0; i < rawLights.length; i++) {
-  //     light = Light(rawLights[i]);
-  //     lights.push(light);
-  //   }
-  //   return loadResource(INPUT_SPHERES_URL);
-  // }
 
 } // end main
