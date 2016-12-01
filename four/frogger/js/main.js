@@ -15,16 +15,19 @@ function main() {
     current = performance.now();
     dt = current - prev;
     prev = current;
-    console.log(dt);
 
   }
 
   for (var i = 0; i < 10; i++) {
     var o = dalí.Entity({secret: i});
-    console.log(o);
+    var c = dalí.Drawable();
+    o.addDrawable(c);
+    console.log(o.getType());
   }
 
-  console.log(dalí.entities);
+  for (let entity of dalí.entities.values()) {
+    entity._update();
+  }
 
-  init();
+  // init();
 }
