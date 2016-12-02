@@ -18,16 +18,21 @@ function main() {
 
   }
 
+  dalí.SceneManager.addScene(dalí.Scene());
+  var scene = dalí.SceneManager.next();
+
   for (var i = 0; i < 10; i++) {
     var o = dalí.Entity({secret: i});
+    scene.addEntity(o);
     var c = dalí.Drawable();
     o.addDrawable(c);
+    c = dalí.Updatable();
+    o.addUpdatable(c);
     console.log(o.getType());
   }
 
-  for (let entity of dalí.entities.values()) {
-    entity._update();
-  }
+  scene.draw();
+  scene.update(1);
 
   // init();
 }

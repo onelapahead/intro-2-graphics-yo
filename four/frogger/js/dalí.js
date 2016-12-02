@@ -13,11 +13,7 @@ String.prototype.hashCode = function() {
 
 // DALÍ 'FRAMEWORK' OBJECT
 var dalí = {
-  entities: new Map(),
-  drawables: new Map(),
-  updatables: new Map(),
   util: {},
-  // colliders: new Map(), etc...?
 };
 
 dalí.util.isString = function (obj) {
@@ -44,17 +40,18 @@ dalí.util.isString = function (obj) {
     return Array(N+1).join((Math.random(performance.now()).toString(36)+'00000000000000000').slice(2, 18)).slice(0, N) + pad(counter++, 3);
   }
 
-  window.dalí.guid = guid;
+  window.dalí._guid = guid;
 
 }) ();
 
 // BASE OBJECT
 dalí.Object = function(base) {
+  // private
   var self = base || {};
-
   var type = null;
 
-  self.guid = dalí.guid();
+  // public
+  self.guid = dalí._guid();
   self.dalí = true;
   self.inherit = 'dalí';
   self.setType = function(_type) {
@@ -69,10 +66,9 @@ dalí.Object = function(base) {
 
 // OBJECT LOOKUP MANAGER
 dalí.ObjectManager = function(objType, base) {
-  var self = dalí.Object(base);
   if (!dalí.util.isString(objType)) throw 'Invalid object type for objType argument';
+  var self = dalí.Object(base);
   var regex = new RegExp(objType.toLowerCase(), 'i');
-
   var objects = new Map();
 
   function checkType(type) {
@@ -118,31 +114,103 @@ dalí.ObjectManager = function(objType, base) {
 
 };
 
+// Scences and SceneManager
+(function () {
+
+  function Scene(base) {
+    var self = dalí.Object(base);
+    self.setType('scene');
+
+    var entities = dalí.ObjectManager('entity');
+
+    self.addEntity = function(entity) { entities.add(entity); };
+
+    self.update = function(dt) {
+      for (let components of entities.all()) {
+        for (let entity of components.values())
+          entity._update(dt);
+      }
+    };
+
+    self.draw = function() {
+      for (let components of entities.all()) {
+        for (let entity of components.values())
+          entity._draw();
+      }
+    };
+
+    return self;
+  }
+
+  // stack and queue in js:
+  //    http://stackoverflow.com/questions/1590247/how-do-you-implement-a-stack-and-a-queue-in-javascript
+  function SceneManager() {
+    var self = dalí.Object();
+    self.setType('scenemanager');
+
+    var sceneOrder = [];
+    var scenes = dalí.ObjectManager('scene');
+    var currentScene = null;
+
+    self.addScene = function (scene) {
+      var index = {
+        type: scene.getType(),
+        guid: scene.guid,
+      };
+      scenes.add(scene);
+      sceneOrder.push(index);
+    };
+
+    self.next = function() {
+      var next = sceneOrder.shift();
+      sceneOrder.push(next);
+      currentScene = scenes.getObj(next.type, next.guid);
+      return currentScene;
+    };
+
+    self.prev = function() {
+      var prev = sceneOrder.pop();
+      sceneOrder.unshift(prev);
+      currentScene = scenes.getObj(prev.type, prev.guid);
+      return currentScene;
+    };
+
+    self.current = function() { return currentScene; };
+
+    return self;
+  }
+
+  window.dalí.SceneManager = SceneManager();
+  window.dalí.Scene = Scene;
+
+}) ();
+
 // GAME ENTITY -- COLLECTION OF UPDATABLES AND DRAWABLES
 dalí.Entity = function (base) {
   var self = dalí.Object(base);
   self.setType('entity');
 
-  // TODO????
-  if (dalí.entities.has(self.guid))
-    throw 'GUID collision';
-  dalí.entities.set(self.guid, self);
-
   var updatables = dalí.ObjectManager('updatable');
   var drawables = dalí.ObjectManager('drawable');
+  var thinkables = dalí.ObjectManager('thinkable');
 
-  self.addUpdatable = function (comp) { updatables.add(comp); }
-  self.addDrawable = function (comp) { drawables.add(comp); }
+  self.addUpdatable = function (comp) { updatables.add(comp); };
+  self.addDrawable = function (comp) { drawables.add(comp); };
+  self.addThinkable = function (comp) { thinkables.add(comp); };
 
-  function _update(dt) {
-    for (let components of updatables.all()) {
+  function _updateCollection(collection, dt) {
+    for (let components of collection.all()) {
       for (let component of components.values()) {
         component.update(dt);
       }
     }
-    self.update(dt);
   }
-  self._update = _update;
+
+  self._update = function(dt) {
+    _updateCollection(updatables, dt);
+    _updateCollection(thinkables, dt);
+    self.update(dt);
+  };
   self.update = function(dt) {}; // framework function -- not required
 
   function _draw() {
@@ -188,6 +256,10 @@ dalí.Drawable = function (base) {
 
   // TODO draw order, draw, etc.
 
+  self.draw = function() {
+    console.log('You should override draw!');
+  };
+
   return self;
 };
 
@@ -200,12 +272,23 @@ dalí.Updatable = function (base) {
 
   self.update = function(dt) {
     // required to implement
-    console.log('year');
-    throw "Not yet implemented update";
+    throw 'Not yet implemented: ' + self.inherit + '.update';
   };
 
   return self;
 
+};
+
+// THINKABLE -- AI COMPONENT
+dalí.Thinkable = function (base) {
+  var self = dalí.Updatable(base);
+  self.setType('thinkable');
+
+  self.think = function () {
+    throw 'Not yet implemented: ' + self.getType() + '.think';
+  };
+
+  return self;
 };
 
 // MODEL FOR DRAWERS
@@ -228,6 +311,15 @@ dalí.Camera = function(base) {
 
 }) ();
 
+// EventManager
+(function () {
+
+  function EventManager() {
+    // TODO
+  }
+
+}) ();
+
 // Physics engine interface
 (function () {
 
@@ -243,15 +335,6 @@ dalí.Camera = function(base) {
 (function () {
   // main camera, eye, project and view matrices
   // textures, models, shaders
-}) ();
-
-// EventManager
-(function () {
-
-  function EventManager() {
-    // TODO
-  }
-
 }) ();
 
 
