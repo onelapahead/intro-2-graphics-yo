@@ -18,15 +18,15 @@ function main() {
 
   }
 
-  dalí.SceneManager.addScene(dalí.Scene());
-  var scene = dalí.SceneManager.next();
+  dali.SceneManager.addScene(dali.Scene());
+  var scene = dali.SceneManager.next();
 
   for (var i = 0; i < 10; i++) {
-    var o = dalí.Entity({secret: i});
+    var o = dali.Entity({secret: i});
     scene.addEntity(o);
-    var c = dalí.Drawable();
+    var c = dali.Drawable();
     o.addDrawable(c);
-    c = dalí.Updatable();
+    c = dali.Updatable();
     o.addUpdatable(c);
     console.log(o.getType());
   }
@@ -35,4 +35,4 @@ function main() {
   scene.update(1);
 
   // init();
-}
+};
