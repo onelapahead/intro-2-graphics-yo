@@ -12,11 +12,9 @@ String.prototype.hashCode = function() {
 };
 
 // DALÍ 'FRAMEWORK' OBJECT
-var dalí = {
-  util: {},
-};
+var dalí = {};
 
-dalí.util.isString = function (obj) {
+dalí.isString = function (obj) {
   return (Object.prototype.toString.call(obj) === '[object String]');
 };
 
@@ -24,7 +22,7 @@ dalí.util.isString = function (obj) {
 (function() {
 
   var counter = 0;
-  const N = 24;
+  const N = 9;
   const T = 999;
 
   // src: http://stackoverflow.com/questions/10073699/pad-a-number-with-leading-zeros-in-javascript
@@ -40,57 +38,54 @@ dalí.util.isString = function (obj) {
     return Array(N+1).join((Math.random(performance.now()).toString(36)+'00000000000000000').slice(2, 18)).slice(0, N) + pad(counter++, 3);
   }
 
-  window.dalí._guid = guid;
+  // BASE OBJECT
+  window.dalí.Object = function(base) {
+    // private
+    var self = base || {};
+    var type;
+
+    // public
+    self.dGUID = guid();
+    self.inherit = 'dalí';
+    self.setType = function(_type) {
+      type = _type;
+      self.inherit += '.' + type;
+    };
+    self.getType = function () { return type; }
+    self.setType('object');
+
+    return self;
+  };
 
 }) ();
 
-// BASE OBJECT
-dalí.Object = function(base) {
-  // private
-  var self = base || {};
-  var type = null;
-
-  // public
-  self.guid = dalí._guid();
-  self.dalí = true;
-  self.inherit = 'dalí';
-  self.setType = function(_type) {
-    type = _type;
-    self.inherit += '.' + type;
-  };
-  self.getType = function () { return type; }
-  self.setType('object');
-
-  return self;
-};
-
 // OBJECT LOOKUP MANAGER
 dalí.ObjectManager = function(objType, base) {
-  if (!dalí.util.isString(objType)) throw 'Invalid object type for objType argument';
+  if (!dalí.isString(objType)) throw 'Invalid object type for objType argument';
   var self = dalí.Object(base);
   var regex = new RegExp(objType.toLowerCase(), 'i');
   var objects = new Map();
 
   function checkType(type) {
-    if (dalí.util.isString(type) && !objects.has(type))
+    if (dalí.isString(type) && !objects.has(type))
       objects.set(type, new Map());
   }
 
   self.add = function (object) {
-    if (object && object.dalí && regex.test(object.inherit)) {
+    if (object && object.dGUID != null && regex.test(object.inherit)) {
       checkType(object.getType());
       var guidMap = objects.get(object.getType());
-      if (guidMap.has(object.guid))
+      if (guidMap.has(object.dGUID))
         throw 'GUID collision';
-      guidMap.set(object.guid, object);
+      guidMap.set(object.dGUID, object);
       return ;
     }
     throw ('Cannot insert: ' + object);
   };
 
   self.getObj = function (type, guid) {
-    if (type && dalí.util.isString(type) && objects.has(type)) {
-      if (guid && dalí.util.isString(guid) && objects.has(guid))
+    if (type && dalí.isString(type) && objects.has(type)) {
+      if (guid && dalí.isString(guid) && objects.has(guid))
         return objects.get(type).get(guid);
       else {
         var first = objects.get(type).values().next();
@@ -101,7 +96,7 @@ dalí.ObjectManager = function(objType, base) {
   };
 
   self.getObjs = function(type) {
-    if (type && dalí.util.isString(type) && objects.has(type))
+    if (type && dalí.isString(type) && objects.has(type))
       return objects.get(type).values();
     throw ('Does not contain an Object of the \'' + type + '\' type');
   };
@@ -155,7 +150,7 @@ dalí.ObjectManager = function(objType, base) {
     self.addScene = function (scene) {
       var index = {
         type: scene.getType(),
-        guid: scene.guid,
+        guid: scene.dGUID,
       };
       scenes.add(scene);
       sceneOrder.push(index);
@@ -186,7 +181,7 @@ dalí.ObjectManager = function(objType, base) {
 }) ();
 
 // GAME ENTITY -- COLLECTION OF UPDATABLES AND DRAWABLES
-dalí.Entity = function (base) {
+dalí.Entity = function (base, tOptions) {
   var self = dalí.Object(base);
   self.setType('entity');
 
@@ -211,18 +206,30 @@ dalí.Entity = function (base) {
     _updateCollection(thinkables, dt);
     self.update(dt);
   };
-  self.update = function(dt) {}; // framework function -- not required
+  // framework function -- not required
+  self.update = function(dt) {};
 
-  function _draw() {
+  self._draw = function() {
     for (let components of drawables.all()) {
       for (let component of components.values()) {
         component.draw();
       }
     }
-  }
-  self._draw = _draw;
+  };
 
-  // TODO add cannon.Transform
+  self._think = function() {
+    for (let components of thinkables.all()) {
+      for (let component of components.values()) {
+        component.think();
+      }
+    }
+  };
+
+  if (tOptions != null) {
+    self.transform = dalí.EntityTransform(tOptions.options, tOptions.base, tOptions.parent);
+  } else {
+    self.transform = dalí.EntityTransform();
+  }
 
   return self;
 };
@@ -240,6 +247,11 @@ dalí.EntityTransform = function (options, base, parent) {
 
   // TODO position -- Vec3, rotation -- Quaterion, scale -- Vec3
   // Uses Cannon math classes
+  if (options != null) {
+    // TODO if pos, rot, scale
+  } else {
+    // TODO defaults
+  }
 
   // TODO outputs glMatrix's mat4, for rendering
   function toMatrix() {
@@ -291,15 +303,6 @@ dalí.Thinkable = function (base) {
   return self;
 };
 
-// MODEL FOR DRAWERS
-dalí.Model = function(base) {
-  var self = dalí.Object(base);
-  self.setType('model');
-  // TODO
-
-  return self;
-};
-
 // CAMERA ENTITY
 dalí.Camera = function(base) {
   var self = dalí.Entity(base);
@@ -333,8 +336,72 @@ dalí.Camera = function(base) {
 
 // Rendering engine and interface
 (function () {
-  // main camera, eye, project and view matrices
-  // textures, models, shaders
+
+  var gl = null;
+  // TODO globals from previous hws
+
+  window.dalí.Material = function(options, base) {
+    var self = window.dalí.Object(base);
+    self.setType('material');
+
+    // TODO
+
+    return self;
+  };
+
+  window.dalí.Light = function(options, base) {
+    var self = window.dalí.Entity(base);
+    self.setType('light');
+
+    // TODO
+
+    return self;
+  };
+
+  window.dalí.Texture = function(options, base) {
+    var self = window.dalí.Object(base);
+    self.setType('texture');
+
+    // TODO
+
+    return self;
+  };
+
+  // SHADER
+  window.dalí.Shader = function(options, base) {
+    var self = window.dalí.Object(base);
+    self.setType('shader');
+
+    // TOOD
+
+    return self;
+  };
+
+  // MODEL FOR DRAWERS
+  window.dalí.Model = function(base) {
+    var self = window.dalí.Object(base);
+    self.setType('model');
+    // TODO
+
+    return self;
+  };
+
+  // MESH
+  window.dalí.Mesh = function(options, base) {
+    var self = window.dalí.Object(base);
+    self.setType('mesh');
+
+    return self;
+  };
+
+  // TRIMESH
+  window.dalí.TriMesh = function(options, base) {
+    var self = window.dalí.Mesh(base);
+    self.setType('trimesh');
+
+    // TODO
+
+    return self;
+  };
+
 }) ();
-
-
