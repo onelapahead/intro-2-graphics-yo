@@ -6,6 +6,33 @@ dali.isString = function (obj) {
   return (Object.prototype.toString.call(obj) === '[object String]');
 };
 
+// good for loading json files
+dali.loadResource = function(url) {
+  return new Promise(function(resolve, reject) {
+    var req = new XMLHttpRequest();
+    req.open('GET', url);
+
+    req.onload = function () {
+        if (this.status == 200 && this.status < 300) {
+            resolve(req.response);
+        } else {
+            reject({
+                status: req.status,
+                statusText: req.statusText
+            });
+        }
+    };
+
+    req.onerror = function() {
+        reject({
+            status: req.status,
+            statusText: req.statusText
+        });
+    };
+    req.send();
+  });
+};
+
 // GUID GENERATOR
 (function() {
 
