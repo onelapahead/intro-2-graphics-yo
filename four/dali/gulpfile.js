@@ -1,3 +1,5 @@
+// helpful example for gulpfile:
+//  http://stackoverflow.com/questions/27554317/how-can-i-change-my-gulp-file-so-that-it-runs-build-task-whenever-theres-a-chan
 
 var gulp = require('gulp'),
     uglifyjs = require('uglify-js'),

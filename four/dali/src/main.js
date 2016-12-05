@@ -22,6 +22,17 @@ function main() {
   var scene = dali.SceneManager.next();
 
   dali.graphx.init();
+
+  var vShader = dali.graphx.Shader({
+    type: dali.graphx.gl.VERTEX_SHADER,
+    code: dali.graphx.g3D.vShaderCodeDefault,
+  });
+
+  var fShader = dali.graphx.Shader({
+    type: dali.graphx.gl.FRAGMENT_SHADER,
+    code: dali.graphx.g3D.fShaderCodeDefault,
+  });
+
   var camera = dali.graphx.g3D.Camera({
     lookAt: [0, 0, 1],
     lookUp: [0, 1, 0],

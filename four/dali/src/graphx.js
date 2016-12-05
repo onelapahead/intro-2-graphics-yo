@@ -14,6 +14,7 @@
     // Get the canvas and context
     var canvas = document.getElementById("myWebGLCanvas"); // get the js canvas
     gl = canvas.getContext("webgl"); // get a webgl object from it
+    graphx.gl = gl;
 
     try {
       if (gl == null) {
@@ -76,7 +77,7 @@
       throw 'Invalid code: ' + options.code + 'must be a string';
 
     glShader = gl.createShader(options.type);
-    gl.sourceShader(glShader, options.code);
+    gl.shaderSource(glShader, options.code);
     gl.compileShader(glShader);
 
     if (!gl.getShaderParameter(glShader, gl.COMPILE_STATUS)) { // bad shader compile
@@ -85,9 +86,9 @@
       throw 'Error during shader compile: ' + log;
     }
 
-    self.attachToProgram = function(shaderProgram) {
+    self.attachToProgram = function(glProgram) {
       // TODO error check for object type
-      gl.attachShader(shaderProgram, glShader);
+      gl.attachShader(glProgram, glShader);
     };
 
     return self;
@@ -126,6 +127,7 @@
 
     // TODO get attrib and uniform pointers
     // TODO create setters for attrib buffers and uniforms
+    // ...
 
     return self;
   };
@@ -211,7 +213,7 @@
     }
 
     function setProjection(options) {
-      if (options == null) options = {};
+      options = options || {};
       projection = {
         fovY: options.fovY || 0.5 * Math.PI,
         near: options.near || 1,
@@ -283,7 +285,7 @@
     };
 
     function init(options) {
-      if (options == null) options = {};
+      options = options || {};
       
       setHandedness(options.handedness);
       setProjection(options);
@@ -511,3 +513,81 @@
   };
 
 }) ();
+
+// define vertex shader in essl using es6 template strings
+dali.graphx.g3D.vShaderCodeDefault = `
+  attribute vec3 aVertexPosition; // vertex position
+  attribute vec3 aVertexNormal; // vertex normal
+  attribute vec2 aVertexTextureCoords; // vertex uv
+
+  uniform mat4 umMatrix; // the model matrix
+  uniform mat4 upvmMatrix; // the project view model matrix
+
+  varying vec3 vWorldPos; // interpolated world position of vertex
+  varying vec3 vVertexNormal; // interpolated normal for frag shader
+  varying highp vec2 vTextureCoords; // interpolated uv
+
+  void main(void) {
+
+      // vertex position
+      vec4 vWorldPos4 = umMatrix * vec4(aVertexPosition, 1.0);
+      vWorldPos = vec3(vWorldPos4.x,vWorldPos4.y,vWorldPos4.z);
+      gl_Position = upvmMatrix * vec4(aVertexPosition, 1.0);
+
+      // vertex normal (assume no non-uniform scale)
+      vec4 vWorldNormal4 = umMatrix * vec4(aVertexNormal, 0.0);
+      vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z));
+
+      vTextureCoords = aVertexTextureCoords;
+  }
+`;
+
+// define fragment shader in essl using es6 template strings
+dali.graphx.g3D.fShaderCodeDefault = `
+  precision mediump float; // set float to medium precision
+
+  // eye location
+  uniform vec3 uEyePosition; // the eye's position in world
+
+  // lights informations
+  uniform int uNumLights; // actual number of lights
+  #define MAX_LIGHTS 20 // allowed max
+  uniform vec3 uLightPositions[MAX_LIGHTS]; // array of light positions
+
+  struct material {
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float shininess;
+  };
+  uniform material uLightProducts[MAX_LIGHTS]; // array of lightProducts (material * light)
+
+  // geometry properties
+  varying vec3 vWorldPos; // world xyz of fragment
+  varying vec3 vVertexNormal; // normal of fragment
+
+  varying highp vec2 vTextureCoords; // interpolated uv
+  uniform sampler2D uTexture; // texture sampler
+  uniform float uAlpha; // material alpha
+
+  void main(void) {
+    vec3 color = vec3(0.0, 0.0, 0.0);
+    for (int i = 0; i < MAX_LIGHTS; i++) {
+      if (i >= uNumLights) break;
+      vec3 L = normalize(uLightPositions[i] - vWorldPos);
+      vec3 E = normalize(uEyePosition - vWorldPos);
+      vec3 H = normalize(L + E);
+      vec3 n = normalize(vVertexNormal);
+
+      vec3 Idiff = uLightProducts[i].diffuse * max(dot(n, L), 0.0);
+      Idiff = clamp(Idiff, 0.0, 1.0);
+
+      vec3 Ispec = uLightProducts[i].specular * pow(max(dot(n, H), 0.0), 4.0 * uLightProducts[i].shininess);
+      Ispec = clamp(Ispec, 0.0, 1.0);
+
+      color = clamp(color + uLightProducts[i].ambient + Idiff + Ispec, 0.0, 1.0);
+    }
+
+    gl_FragColor = vec4(color, uAlpha) * texture2D(uTexture, vec2(vTextureCoords.s, vTextureCoords.t));
+  }
+`;

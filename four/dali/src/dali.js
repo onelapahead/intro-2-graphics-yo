@@ -11,7 +11,7 @@ var dali = {
   audio: {},
 };
 
-const objTypes = ['String', 'Number', 'Array'];
+const objTypes = ['String', 'Number', 'Array', 'Object'];
 objTypes.forEach(function(type) {
   dali['is' + type] = function (obj) {
     return (Object.prototype.toString.call(obj) === '[object ' + type + ']');
@@ -46,7 +46,7 @@ delete objTypes;
     var type;
 
     // public
-    self.dGUID = guid();
+    self.dGUID = self.dGUID || guid();
     self.inherit = 'dali';
     self.setType = function(_type) {
       type = _type;
@@ -240,10 +240,12 @@ dali.EntityTransform = function (options, base, parent) {
 
   if (options != null) {
     // TODO if pos, rot, scale
+    // TODO set values from model/body...
   } else {
     setDefaults();
   }
 
+  // TODO add frame caching for matrix transform isn't recalculated
   self.toMatrix = function() {
     var t = mat4.create();
     mat4.fromRotationTranslationScaleOrigin(
@@ -253,10 +255,10 @@ dali.EntityTransform = function (options, base, parent) {
       scale.vec3(),
       vec3.fromValues(0, 0, 0)
     );
+    if (self.parent != null)
+      mat4.multiply(t, self.parent.toMatrix(), t);
     return t;
   }
-
-  // TODO set values from model/body...
 
   return self;
 };
