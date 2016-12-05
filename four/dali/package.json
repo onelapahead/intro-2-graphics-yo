@@ -1,0 +1,23 @@
+{
+  "name": "dali",
+  "version": "1.0.0",
+  "description": "WebGL game engine",
+  "main": "dali.min.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "gulp-jshint": "^2.0.4",
+    "gulp-uglify": "^2.0.0",
+    "gulp-concat": "^2.6.1",
+    "jshint": "^2.9.4",
+    "pump": "^1.0.1",
+    "uglify-js": "^2.7.5"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "gulp test"
+  },
+  "author": "Hayden Fuss <wifu1234@gmail.com>",
+  "license": "ISC"
+}

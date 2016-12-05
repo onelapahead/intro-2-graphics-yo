@@ -21,17 +21,31 @@ function main() {
   dali.SceneManager.addScene(dali.Scene());
   var scene = dali.SceneManager.next();
 
+  dali.graphx.init();
+  var camera = dali.graphx.g3D.Camera({
+    lookAt: [0, 0, 1],
+    lookUp: [0, 1, 0],
+    eyeDistance: 1.0
+  });
+  
+  // Test camera rotation
+  // var rot = camera.transform.getRotation().quat();
+  // quat.rotateY(rot, rot, Math.PI * 0.5);
+  // camera.transform.setRotationFromQuat(rot);
+  // camera.update(1);
+  // console.log(camera);
+
   for (var i = 0; i < 10; i++) {
     var o = dali.Entity({secret: i});
     scene.addEntity(o);
-    var c = dali.Drawable();
-    o.addDrawable(c);
+    var c = dali.Renderable();
+    o.addRenderable(c);
     c = dali.Updatable();
     o.addUpdatable(c);
     console.log(o.getType());
   }
 
-  scene.draw();
+  scene.render();
   scene.update(1);
 
   // init();

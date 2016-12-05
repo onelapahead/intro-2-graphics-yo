@@ -18,10 +18,10 @@
       }
     };
 
-    self.draw = function() {
+    self.render = function() {
       for (var components of entities.all()) {
         for (var entity of components.values())
-          entity._draw();
+          entity._render();
       }
     };
 

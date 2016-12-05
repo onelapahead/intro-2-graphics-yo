@@ -1,37 +1,23 @@
 
 // DALÍ 'FRAMEWORK' OBJECT
-var dali = {};
-
-dali.isString = function (obj) {
-  return (Object.prototype.toString.call(obj) === '[object String]');
+var dali = {
+  graphx: {
+    g3D: {},
+    g2D: {}
+  },
+  physx: {
+    p3D: {}
+  },
+  audio: {},
 };
 
-// good for loading json files
-dali.loadResource = function(url) {
-  return new Promise(function(resolve, reject) {
-    var req = new XMLHttpRequest();
-    req.open('GET', url);
-
-    req.onload = function () {
-        if (this.status == 200 && this.status < 300) {
-            resolve(req.response);
-        } else {
-            reject({
-                status: req.status,
-                statusText: req.statusText
-            });
-        }
-    };
-
-    req.onerror = function() {
-        reject({
-            status: req.status,
-            statusText: req.statusText
-        });
-    };
-    req.send();
-  });
-};
+const objTypes = ['String', 'Number', 'Array'];
+objTypes.forEach(function(type) {
+  dali['is' + type] = function (obj) {
+    return (Object.prototype.toString.call(obj) === '[object ' + type + ']');
+  };
+});
+delete objTypes;
 
 // GUID GENERATOR
 (function() {
@@ -128,13 +114,13 @@ dali.ObjectManager = function(objType, base) {
 };
 
 // GAME ENTITY -- COLLECTION OF UPDATABLES AND DRAWABLES
-dali.Entity = function (base, tOptions) {
+dali.Entity = function (options, base) {
   // private
   var self = dali.Object(base);
   self.setType('entity');
 
   var updatables = dali.ObjectManager('updatable');
-  var drawables = dali.ObjectManager('drawable');
+  var renderables = dali.ObjectManager('renderable');
   var thinkables = dali.ObjectManager('thinkable');
 
   function _updateCollection(collection, dt) {
@@ -147,7 +133,7 @@ dali.Entity = function (base, tOptions) {
 
   // public
   self.addUpdatable = function (comp) { updatables.add(comp); };
-  self.addDrawable = function (comp) { drawables.add(comp); };
+  self.addRenderable = function (comp) { renderables.add(comp); };
   self.addThinkable = function (comp) { thinkables.add(comp); };
 
   self._update = function(dt) {
@@ -158,10 +144,10 @@ dali.Entity = function (base, tOptions) {
   // framework function -- not required
   self.update = function(dt) {};
 
-  self._draw = function() {
-    for (var components of drawables.all()) {
+  self._render = function() {
+    for (var components of renderables.all()) {
       for (var component of components.values()) {
-        component.draw();
+        component.render();
       }
     }
   };
@@ -174,10 +160,10 @@ dali.Entity = function (base, tOptions) {
     }
   };
 
-  if (tOptions != null) {
-    self.transform = dali.EntityTransform(tOptions.options, tOptions.base, tOptions.parent);
-  } else {
+  if (options == null || options.transform == null)
     self.transform = dali.EntityTransform();
+  else {
+    self.transform = dali.EntityTransform(options.transform.options, options.transform.base, options.transform.parent);
   }
 
   return self;
@@ -194,31 +180,96 @@ dali.EntityTransform = function (options, base, parent) {
   // parent EntityTransform for object hierarchies
   self.parent = parent || null;
 
-  // TODO position -- Vec3, rotation -- Quaterion, scale -- Vec3
-  // Uses Cannon math classes
+  var position = null, rotation = null, scale = null;
+
+  self.setPosition = function(_position) {
+    if (_position == null) _position = {};
+    position = new CANNON.Vec3(_position.x || 0.0, _position.y || 0.0, _position.z || 0.0);
+
+    position.vec3 = function() {
+      return vec3.fromValues(position.x,position.y,position.z);
+    };
+  };
+
+  self.getPosition = function() {
+    return position;
+  };
+
+  self.setScale = function(_scale) {
+    if (_scale == null) _scale = {};
+    scale = new CANNON.Vec3(_scale.x || 1.0, _scale.y || 1.0, _scale.z || 1.0);
+
+    scale.vec3 = function() {
+      return vec3.fromValues(scale.x,scale.y,scale.z);
+    };
+  };
+
+  self.getScale = function() {
+    return scale;
+  };
+
+  self.setRotationFromAxes = function(axes) {
+    axes = axes || {};
+    axes.up = axes.up || vec3.fromValues(0, 1, 0);
+    axes.at = axes.at || vec3.fromValues(0, 0, 1);
+
+    var right = vec3.create();
+    vec3.cross(right, axes.up, axes.at);
+
+    var rot = quat.create();
+    quat.setAxes(rot, axes.at, right, axes.up);
+
+    self.setRotationFromQuat(rot);
+  };
+
+  self.setRotationFromQuat = function(_quat) {
+    _quat = _quat || quat.fromValues(0.0, 0.0, 0.0, 1.0);
+    rotation = new CANNON.Quaternion(_quat[0], _quat[1], _quat[2], _quat[3]);
+    rotation.quat = function() {
+      return quat.fromValues(rotation.x, rotation.y, rotation.z, rotation.w);
+    };
+  };
+
+  self.getRotation = function() { return rotation; };
+
+  function setDefaults() {
+    self.setPosition();
+    self.setRotationFromAxes();
+    self.setScale();
+  }
+
   if (options != null) {
     // TODO if pos, rot, scale
   } else {
-    // TODO defaults
+    setDefaults();
   }
 
-  // TODO outputs glMatrix's mat4, for rendering
-  function toMatrix() {
-    throw "Not yet implemented toMatrix";
+  self.toMatrix = function() {
+    var t = mat4.create();
+    mat4.fromRotationTranslationScaleOrigin(
+      t, 
+      rotation.quat(),
+      position.vec3(),
+      scale.vec3(),
+      vec3.fromValues(0, 0, 0)
+    );
+    return t;
   }
+
+  // TODO set values from model/body...
 
   return self;
 };
 
-// A DRAWABLE COMPONENT
-dali.Drawable = function (base) {
+// A RENDERABLE COMPONENT
+dali.Renderable = function (base) {
   var self = dali.Object(base);
-  self.setType('drawable');
+  self.setType('renderable');
 
-  // TODO draw order, draw, etc.
+  // TODO render order, render, etc.
 
-  self.draw = function() {
-    console.log('You should override draw!');
+  self.render = function() {
+    console.log('You should override render!');
   };
 
   return self;
