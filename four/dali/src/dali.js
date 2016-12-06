@@ -11,7 +11,7 @@ var dali = {
   audio: {},
 };
 
-const objTypes = ['String', 'Number', 'Array', 'Object'];
+const objTypes = ['String', 'Number', 'Array', 'Object', 'Map'];
 objTypes.forEach(function(type) {
   dali['is' + type] = function (obj) {
     return (Object.prototype.toString.call(obj) === '[object ' + type + ']');

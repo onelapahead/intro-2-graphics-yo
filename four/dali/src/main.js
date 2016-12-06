@@ -33,6 +33,14 @@ function main() {
     code: dali.graphx.g3D.fShaderCodeDefault,
   });
 
+  var program = dali.graphx.g3D.ShaderProgram3D({
+    'vShader': vShader,
+    'fShader': fShader
+  });
+  program.createSetters();
+  console.log(program.getUniformSetters());
+  console.log(program.getAttribSetters());
+
   var camera = dali.graphx.g3D.Camera({
     lookAt: [0, 0, 1],
     lookUp: [0, 1, 0],
