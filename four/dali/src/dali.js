@@ -19,6 +19,10 @@ objTypes.forEach(function(type) {
 });
 delete objTypes;
 
+dali.isDaliObj = function(obj) {
+  return obj != null && obj.dGUID != null && obj.getType != null && obj.inherit != null && /dali/i.test(obj.inherit);
+};
+
 // GUID GENERATOR
 (function() {
 
@@ -66,8 +70,10 @@ dali.ObjectManager = function(objType, base) {
   
   // private
   var self = dali.Object(base);
+  self.setType('objectmanager');
   var regex = new RegExp(objType.toLowerCase(), 'i');
   var objects = new Map();
+  var queue = [];
 
   function checkType(type) {
     if (dali.isString(type) && !objects.has(type))
@@ -76,38 +82,58 @@ dali.ObjectManager = function(objType, base) {
 
   // public
   self.add = function (object) {
-    if (object && object.dGUID != null && regex.test(object.inherit)) {
+    if (dali.isDaliObj(object) && regex.test(object.inherit)) {
       checkType(object.getType());
       var guidMap = objects.get(object.getType());
       if (guidMap.has(object.dGUID))
         throw 'GUID collision';
       guidMap.set(object.dGUID, object);
+      queue.push({ guid: object.dGUID, type: object.getType() });
       return ;
     }
     throw ('Cannot insert: ' + object);
   };
 
+  self.size = function() { return queue.length; };
+
   self.getObj = function (type, guid) {
-    if (type && dali.isString(type) && objects.has(type)) {
-      if (guid && dali.isString(guid) && objects.has(guid))
+    if (type != null && dali.isNumber(type) && guid == null && type < queue.length && type > -1) {
+      var info = queue[type];
+      type = info.type;
+      guid = info.guid;
+    }
+
+    if (type != null && dali.isString(type) && objects.has(type)) {
+      if (guid != null && dali.isString(guid) && objects.has(guid))
         return objects.get(type).get(guid);
       else {
         var first = objects.get(type).values().next();
         if (!first.done) return first.value;
       }
     }
-    throw ('Does not contain an Object of the \'' + type + '\' type');
+    throw ('Does not contain an Object of type: \'' + type + '\'');
   };
 
   self.getObjs = function(type) {
-    if (type && dali.isString(type) && objects.has(type))
+    if (type != null && dali.isString(type) && objects.has(type))
       return objects.get(type).values();
-    throw ('Does not contain an Object of the \'' + type + '\' type');
+    throw ('Does not contain an Object of type: \'' + type + '\'');
   };
 
-  self.all = function() {
-    return objects.values();
+  self[Symbol.iterator] = function() {
+    return {
+      ptr: 0,
+      next: function() {
+        if (this.ptr > self.size() - 1) return { done: true };
+        return {
+         value: self.getObj(this.ptr++),
+         done: false,
+        };
+      }
+    };
   };
+
+  self.iterator = self[Symbol.iterator];
 
   return self;
 
@@ -124,10 +150,8 @@ dali.Entity = function (options, base) {
   var thinkables = dali.ObjectManager('thinkable');
 
   function _updateCollection(collection, dt) {
-    for (var components of collection.all()) {
-      for (var component of components.values()) {
-        component.update(dt);
-      }
+    for (var component of collection) {
+      component.update(dt);
     }
   }
 
@@ -144,19 +168,15 @@ dali.Entity = function (options, base) {
   // framework function -- not required
   self.update = function(dt) {};
 
-  self._render = function() {
-    for (var components of renderables.all()) {
-      for (var component of components.values()) {
-        component.render();
-      }
+  self._requestRender = function() {
+    for (var component of renderables) {
+      component.requestRender();
     }
   };
 
   self._think = function() {
-    for (var components of thinkables.all()) {
-      for (var component of components.values()) {
-        component.think();
-      }
+    for (var component of thinkables) {
+      component.think();
     }
   };
 
@@ -232,18 +252,13 @@ dali.EntityTransform = function (options, base, parent) {
 
   self.getRotation = function() { return rotation; };
 
-  function setDefaults() {
-    self.setPosition();
-    self.setRotationFromAxes();
-    self.setScale();
+  function set(options) {
+    options = options || {};
+    self.setPosition(options.position);
+    self.setRotationFromAxes(options.axes);
+    self.setScale(options.scale);
   }
-
-  if (options != null) {
-    // TODO if pos, rot, scale
-    // TODO set values from model/body...
-  } else {
-    setDefaults();
-  }
+  set(options);
 
   // TODO add frame caching for matrix transform isn't recalculated
   self.toMatrix = function() {
@@ -270,8 +285,8 @@ dali.Renderable = function (base) {
 
   // TODO render order, render, etc.
 
-  self.render = function() {
-    console.log('You should override render!');
+  self.requestRender = function() {
+    console.log('You should override requestRender!');
   };
 
   return self;

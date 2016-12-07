@@ -4,24 +4,22 @@
 
   function Scene(base) {
     // private
-    var self = dali.Object(base);
+    var self = window.dali.Object(base);
     self.setType('scene');
 
-    var entities = dali.ObjectManager('entity');
+    var entities = window.dali.ObjectManager('entity');
 
     self.addEntity = function(entity) { entities.add(entity); };
 
     self.update = function(dt) {
-      for (var components of entities.all()) {
-        for (var entity of components.values())
-          entity._update(dt);
+      for (var entity of entities) {
+        entity._update(dt);
       }
     };
 
-    self.render = function() {
-      for (var components of entities.all()) {
-        for (var entity of components.values())
-          entity._render();
+    self.requestRender = function() {
+      for (var entity of entities) {
+        entity._requestRender();
       }
     };
 
@@ -32,11 +30,13 @@
   //    http://stackoverflow.com/questions/1590247/how-do-you-implement-a-stack-and-a-queue-in-javascript
   function SceneManager() {
     // private
-    var self = dali.Object();
+    var self = window.dali.Object();
     self.setType('scenemanager');
 
+    // TODO maintain initial state, make it return an iterator
+
     var sceneOrder = [];
-    var scenes = dali.ObjectManager('scene');
+    var scenes = window.dali.ObjectManager('scene');
     var currentScene = null;
 
     // public

@@ -23,7 +23,6 @@
         gl.clearColor(0.0, 0.0, 0.0, 1.0); // use black when we clear the frame buffer
         gl.clearDepth(1.0); // use max when we clear the depth buffer
         gl.enable(gl.DEPTH_TEST); // use hidden surface removal (with zbuffering)
-        setUniformFunctions();
       }
     } // end try
     catch(e) {
@@ -58,6 +57,18 @@
      *
      */
 
+  };
+
+  var shaderQueue = [];
+  var requestMap = new Map();
+  var shaders = window.dali.ObjectManager('shaderprogram');
+  graphx.addProgram = function(program) {
+
+  };
+
+
+  graphx.requestRender = function() {
+    // TODO
   };
 
   graphx.Color = function(options) {
@@ -147,21 +158,6 @@
     return self;
   };
 
-  var uniformFunctions = {};
-  function setUniformFunctions() {
-    uniformFunctions[gl.FLOAT] = gl.uniform1f;
-    uniformFunctions[gl.INT] = gl.uniform1i;
-    uniformFunctions[gl.FLOAT_VEC3] = gl.uniform3fv;
-    uniformFunctions[gl.FLOAT_MAT4] = function(loc, arr) {
-      return gl.uniformMatrix4fv(loc, false, arr);
-    };
-    uniformFunctions[gl.SAMPLER_2D] = function(loc, texture) {
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.uniform1i(loc, 0);
-    };
-  }
-
   // SHADERPROGRAM
   // WRAPS GL'S SHADER PROGRAM AND CONTAINS PTRS
   graphx.ShaderProgram = function(options, base) {
@@ -205,19 +201,35 @@
       gl.useProgram(glProgram);
     };
 
+    var uniformFunctions = {};
+    function setUniformFunctions() {
+      uniformFunctions[gl.FLOAT] = function (loc, arr) { gl.uniform1f(loc, arr); };
+      uniformFunctions[gl.INT] = function (loc, arr) { gl.uniform1i(loc, arr); };
+      uniformFunctions[gl.FLOAT_VEC3] = function (loc, arr) { gl.uniform3fv(loc, arr); };
+      uniformFunctions[gl.FLOAT_MAT4] = function(loc, arr) {
+        gl.uniformMatrix4fv(loc, false, arr);
+      };
+      uniformFunctions[gl.SAMPLER_2D] = function(loc, texture) {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(loc, 0);
+      };
+    }
+
     self.createSetters = function() {
       self.use();
 
+      setUniformFunctions();
       createAttribSetters();
       createUniformSetters();
     };
 
-    var attribSetters = {};
+    self.attribSetters = {};
     function createAttribSetters() {
       for (var name in attribs) {
         if (!attribs.hasOwnProperty(name)) continue;
         aLoc = gl.getAttribLocation(glProgram, name);
-        attribSetters[name] = createAttribSetter(aLoc, name);
+        self.attribSetters[name] = createAttribSetter(aLoc, name);
       }
     }
 
@@ -231,22 +243,22 @@
 
     self.setAttrib = function(aName, buffer) {
       // TODO
-      attribSetters[aName](buffer);
+      self.attribSetters[aName](buffer);
     };
 
-    var uniformSetters = {};
+    self.uniformSetters = {};
     function createUniformSetters() {
       var uLoc;
       for (var name in uniforms) {
         name = name.replace(/\[[0-9]+\]/, '');
         if (window.dali.isNumber(uniforms[name])) {
           uLoc = gl.getUniformLocation(glProgram, name);
-          uniformSetters[name] = createUniformSetter(uLoc, uniforms[name]);
+          self.uniformSetters[name] = createUniformSetter(uLoc, uniforms[name]);
         } else if (window.dali.isObject(uniforms[name])) {
           var obj = uniforms[name];
           for (var i = 0; i < obj.length; i++) {
             uLoc = gl.getUniformLocation(glProgram, name + '[' + i + ']');
-            uniformSetters[name  + '[' + i + ']'] = createUniformSetter(uLoc, obj.type);
+            self.uniformSetters[name  + '[' + i + ']'] = createUniformSetter(uLoc, obj.type);
           }
         } else {
           throw 'Invalid unform info';
@@ -262,11 +274,8 @@
 
     self.setUniform = function(uName, v) {
       // TODO error check
-      uniformSetters[uName](v);
+      self.uniformSetters[uName](v);
     };
-
-    self.getUniformSetters = function() { return uniformSetters; };
-    self.getAttribSetters = function() { return attribSetters; };
 
     return self;
   };
@@ -274,10 +283,8 @@
   // 3D Graphics
   // -----------------------------------------------------------
 
-  var lights = [];
-  graphx.g3D.mainCamera;
-
   graphx.g3D.MAX_LIGHTS = 20;
+
   graphx.g3D.ShaderProgram3D = function(options, base) {
     options = options || {};
     options.attribs = options.attribs || {};
@@ -301,17 +308,45 @@
     var self = graphx.ShaderProgram(options, base);
     self.setType('shaderprogram3d');
 
+    self.init = function() {
+      if (mainCamera3d == null) graphx.g3D.Camera();
+    }
+
     self.render = function() {
       // TODO
+      self.use();
+      self.setUniform('uEyePosition', mainCamera3d.transform.getPosition().vec3());
+
+      var lights = light3ds.iterator();
+      var light;
+      self.setUniform('uNumLights', light3ds.size());
+      for (var i = 0; i < light3ds.size(); i++) {
+        console.log('Setting some lights' + i);
+        light = lights.next().value;
+        self.setUniform('uLightPositions[' + i + ']', light.transform.getPosition().vec3());
+      }
+
+      /**
+       *    get all opaque drawables that requested to draw associated with program
+       *    for each model of drawables
+       *      bind model position/normal/uv buffers to attributes
+       *      for each texture of textures assoicated with model
+       *        for each drawable with texture, model, shader
+       *          render
+       *    repeat for transparent objects with z-buffering off
+       */
     };
 
     return self;
   };
 
+  var mainCamera3d;
   // CAMERA ENTITY
   graphx.g3D.Camera = function(options, base) {
     var self = window.dali.Entity(options, base);
     self.setType('camera3d');
+
+    if (mainCamera3d == null || options.main) mainCamera3d = self;
 
     var handedness;
     var projection;
@@ -417,10 +452,12 @@
     return self;
   };
 
+  var light3ds = window.dali.ObjectManager('light3d');
   graphx.g3D.Light = function(options, base) {
     var self = window.dali.Entity(options, base);
     self.setType('light3d');
     self.color = graphx.Color(options);
+    light3ds.add(self);
 
     // TODO
 
@@ -432,52 +469,6 @@
     self.setType('texture3d');
 
     if (options == null) throw 'Invalid options: ' + options;
-
-    // TODO edit
-    // used for loading images to be used as textures
-    function loadTexture(obj, url) {
-      return new Promise(function(resolve, reject) {
-        obj.glTexture = gl.createTexture();
-        obj.img = new Image();
-        obj.img.crossOrigin = "anonymous";
-        obj.img.onload = function () {
-          console.log(url);
-          // test if the image has a transparent pixel using imgData
-          var canvas = document.createElement("canvas");
-          var ctx = canvas.getContext("2d");
-
-          canvas.width = obj.img.width;
-          canvas.height = obj.img.height;
-
-          ctx.drawImage(obj.img, 0, 0);
-          var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-          obj.isTranslucentTexture = false;
-          for (var i = 0; i < imgData.length; i+=4) {
-            if (imgData[i + 3] < 255) {
-                obj.isTranslucentTexture = true;
-                break;
-            }
-          }
-
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          delete canvas;
-          delete ctx;
-
-          gl.bindTexture(gl.TEXTURE_2D, obj.glTexture);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, obj.img);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
-          gl.generateMipmap(gl.TEXTURE_2D);
-          gl.bindTexture(gl.TEXTURE_2D, null);
-
-          resolve(true);
-        };
-        obj.img.onerror = function() {
-            reject({ status: "Failed to load texture: " + url });
-        }
-        obj.img.src = url;
-      });
-    }
 
     // creates a "texture" of a solid color. used to create the blank, default texture
     // 0 - 255
@@ -498,7 +489,16 @@
       // TODO
     } else if (options.r != null && options.g != null && options.b != null && options.a != null) {
       createSolidTexture(options.r, options.g, options.b, options.a);
-    }
+    } else throw 'Invalid options: ' + options;
+
+    return self;
+  };
+
+  graphx.g3D.Renderable3D = function(options, base) {
+    var self = window.dali.Renderable(base);
+    self.setType('renderable3d');
+
+    // TODO must contain a Model, a Texture, and a Material
 
     return self;
   };
@@ -516,7 +516,7 @@
 
     var mesh = options.mesh;
     var transform = mat4.create();
-
+    mat4.idenity(transform);
     // TODO make model transform from initial position, rotation, scale of model
 
     return self;

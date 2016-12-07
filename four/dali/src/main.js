@@ -38,14 +38,33 @@ function main() {
     'fShader': fShader
   });
   program.createSetters();
-  console.log(program.getUniformSetters());
-  console.log(program.getAttribSetters());
+  console.log(program.uniformSetters);
+  console.log(program.attribSetters);
 
   var camera = dali.graphx.g3D.Camera({
     lookAt: [0, 0, 1],
     lookUp: [0, 1, 0],
     eyeDistance: 1.0
   });
+
+  var light = dali.graphx.g3D.Light({
+    transform: {
+      options: {
+        position: {
+          x: 1.0, y: 0.5, z: 0.75
+        },
+      },
+      parent: null,
+      base: null,
+    },
+    ambient: [0.6, 0.0, 0.0],
+    diffuse: [0.6, 0.6, 0.6],
+    specular: [0.6, 0.6, 0],
+  });
+  console.log(light);
+
+  program.init();
+  program.render();
   
   // Test camera rotation
   // var rot = camera.transform.getRotation().quat();
@@ -64,7 +83,7 @@ function main() {
     console.log(o.getType());
   }
 
-  scene.render();
+  scene.requestRender();
   scene.update(1);
 
   // init();
