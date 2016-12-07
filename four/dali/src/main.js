@@ -21,31 +21,15 @@ function main() {
   dali.SceneManager.addScene(dali.Scene());
   var scene = dali.SceneManager.next();
 
-  dali.graphx.init();
-
-  var vShader = dali.graphx.Shader({
-    type: dali.graphx.gl.VERTEX_SHADER,
-    code: dali.graphx.g3D.vShaderCodeDefault,
-  });
-
-  var fShader = dali.graphx.Shader({
-    type: dali.graphx.gl.FRAGMENT_SHADER,
-    code: dali.graphx.g3D.fShaderCodeDefault,
-  });
-
-  var program = dali.graphx.g3D.ShaderProgram3D({
-    'vShader': vShader,
-    'fShader': fShader
-  });
-  program.createSetters();
-  console.log(program.uniformSetters);
-  console.log(program.attribSetters);
+  // loads WebGL
+  dali.graphx.load();
 
   var camera = dali.graphx.g3D.Camera({
     lookAt: [0, 0, 1],
     lookUp: [0, 1, 0],
     eyeDistance: 1.0
   });
+  scene.addEntity(camera);
 
   var light = dali.graphx.g3D.Light({
     transform: {
@@ -62,16 +46,19 @@ function main() {
     specular: [0.6, 0.6, 0],
   });
   console.log(light);
-
-  program.init();
-  program.render();
+  scene.addEntity(light);
   
+  // initalize shader programs, b/c none were added,
+  // creates default 3d per-pixel lighting shader
+  dali.graphx.init();
+
   // Test camera rotation
-  // var rot = camera.transform.getRotation().quat();
-  // quat.rotateY(rot, rot, Math.PI * 0.5);
-  // camera.transform.setRotationFromQuat(rot);
-  // camera.update(1);
-  // console.log(camera);
+  var rot = camera.transform.getRotation().quat();
+  console.log(rot);
+  quat.rotateY(rot, rot, Math.PI * 0.5);
+  camera.transform.setRotationFromQuat(rot);
+  camera.update(1);
+  console.log(camera);
 
   for (var i = 0; i < 10; i++) {
     var o = dali.Entity({secret: i});
@@ -84,6 +71,7 @@ function main() {
   }
 
   scene.requestRender();
+  dali.graphx.render();
   scene.update(1);
 
   // init();

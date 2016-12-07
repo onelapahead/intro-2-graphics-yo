@@ -7,10 +7,9 @@
 // ----------------------------------------------------------------------
   var gl = null;
   var graphx = window.dali.graphx;
-  // TODO globals from previous hws
 
   // set up the webGL environment
-  graphx.init = function() {
+  graphx.load = function() {
     // Get the canvas and context
     var canvas = document.getElementById("myWebGLCanvas"); // get the js canvas
     gl = canvas.getContext("webgl"); // get a webgl object from it
@@ -31,44 +30,53 @@
 
   } // end init
 
-  function loadModels() {
-    // TODO
-  }
-
-  function loadShaders() {
-    // TODO
-  }
-
-  graphx.load = function() {
-    loadShaders();
-    loadModels();
-  };
-
-  graphx.render = function() {
-    /**
-     * for each program in shaderPrograms
-     *    get all opaque drawables that requested to draw associated with program
-     *    for each model of drawables
-     *      bind model position/normal/uv buffers to attributes
-     *      for each texture of textures assoicated with model
-     *        for each drawable with texture, model, shader
-     *          render
-     *    repeat for transparent objects with z-buffering off
-     *
-     */
-
-  };
-
-  var shaderQueue = [];
-  var requestMap = new Map();
+  var shaderQueue = []; // TODO make it a heap
   var shaders = window.dali.ObjectManager('shaderprogram');
-  graphx.addProgram = function(program) {
+  var shader3d;
 
+  // prereq: load, addProgram
+  graphx.init = function() {
+    if (shader3d == null) {
+      shader3d = graphx.g3D.ShaderProgram3D();
+      graphx.addProgram(shader3d);
+    }
+
+    for (var shaderInfo of shaderQueue) {
+      shaders.getObj(shaderInfo.guid).init();
+    }
   };
 
+  // prereq: init
+  graphx.render = function() {
+    var shader;
+    for (var shaderInfo of shaderQueue) {
+      shader = shaders.getObj(shaderInfo.guid);
+      shader.render();
+      shader.clearRequests();
+    }
+  };
 
-  graphx.requestRender = function() {
-    // TODO
+  // prereq: load
+  graphx.addProgram = function(program, priority) {
+    if (priority == null || !window.dali.isNumber(priority)) priority = 0;
+    shaders.add(program);
+    for (var i = 0; i <= shaderQueue.length; i++) {
+      if (i == shaderQueue.length || shaderQueue[i].priority > priority) {
+        shaderQueue.splice(
+          i,
+          0, 
+          { 'priority': priority, guid: program.dGUID }
+        );
+        break;
+      }
+    }
+  };
+
+  // prereq: init
+  function requestRender(options, shaderGuid) {
+    // TODO error check
+    var shader = shaders.getObj(shaderGuid);
+    shader.requestRender(options);
   };
 
   graphx.Color = function(options) {
@@ -117,6 +125,8 @@
         self.n = DEFAULT_MATERIAL_SHININESS;
     }
 
+    // TODO alpha
+
     if (options == null) setExponent();
     else setExponent(options.n);
 
@@ -124,6 +134,7 @@
   };
 
   // SHADER
+  // prereq: load
   graphx.Shader = function(options, base) {
     var self = window.dali.Object(base);
     self.setType('shader');
@@ -160,6 +171,7 @@
 
   // SHADERPROGRAM
   // WRAPS GL'S SHADER PROGRAM AND CONTAINS PTRS
+  // prereq: load
   graphx.ShaderProgram = function(options, base) {
     var self = window.dali.Object(base);
     self.setType('shaderprogram');
@@ -171,12 +183,12 @@
     if (options == null)
       throw 'Invalid options: ' + options;
 
-    if (options.vShader == null || options.vShader.inherit == null || !/vertex/i.test(options.vShader.inherit))
+    if (options.vShader == null || options.vShader.inherit == null || !options.vShader.isType('vertex'))
       throw 'Vertex Shader error: ' + options.vShader;
     vShader = options.vShader;
     vShader.attachToProgram(glProgram);
 
-    if (options.fShader == null || options.fShader.inherit == null || !/fragment/i.test(options.fShader.inherit))
+    if (options.fShader == null || options.fShader.inherit == null || !options.fShader.isType('fragment'))
       throw 'Fragment Shader error: ' + options.fShader;
     fShader = options.fShader;
     fShader.attachToProgram(glProgram);
@@ -224,12 +236,12 @@
       createUniformSetters();
     };
 
-    self.attribSetters = {};
+    var attribSetters = {};
     function createAttribSetters() {
       for (var name in attribs) {
         if (!attribs.hasOwnProperty(name)) continue;
         aLoc = gl.getAttribLocation(glProgram, name);
-        self.attribSetters[name] = createAttribSetter(aLoc, name);
+        attribSetters[name] = createAttribSetter(aLoc, name);
       }
     }
 
@@ -242,23 +254,23 @@
     }
 
     self.setAttrib = function(aName, buffer) {
-      // TODO
-      self.attribSetters[aName](buffer);
+      // TODO error check
+      attribSetters[aName](buffer);
     };
 
-    self.uniformSetters = {};
+    var uniformSetters = {};
     function createUniformSetters() {
       var uLoc;
       for (var name in uniforms) {
         name = name.replace(/\[[0-9]+\]/, '');
         if (window.dali.isNumber(uniforms[name])) {
           uLoc = gl.getUniformLocation(glProgram, name);
-          self.uniformSetters[name] = createUniformSetter(uLoc, uniforms[name]);
+          uniformSetters[name] = createUniformSetter(uLoc, uniforms[name]);
         } else if (window.dali.isObject(uniforms[name])) {
           var obj = uniforms[name];
           for (var i = 0; i < obj.length; i++) {
             uLoc = gl.getUniformLocation(glProgram, name + '[' + i + ']');
-            self.uniformSetters[name  + '[' + i + ']'] = createUniformSetter(uLoc, obj.type);
+            uniformSetters[name  + '[' + i + ']'] = createUniformSetter(uLoc, obj.type);
           }
         } else {
           throw 'Invalid unform info';
@@ -274,7 +286,23 @@
 
     self.setUniform = function(uName, v) {
       // TODO error check
-      self.uniformSetters[uName](v);
+      uniformSetters[uName](v);
+    };
+
+    self.init = function() {
+      throw 'Not yet implemented ' + self.inherit + '.init';      
+    };
+
+    self.render = function() {
+      throw 'Not yet implemented ' + self.inherit + '.render';
+    };
+
+    self.requestRender = function() {
+      throw 'Not yet implemented ' + self.inherit + '.requestRender';
+    };
+
+    self.clearRequests = function() {
+      throw 'Not yet implemented ' + self.inherit + '.clearRequests';
     };
 
     return self;
@@ -283,8 +311,8 @@
   // 3D Graphics
   // -----------------------------------------------------------
 
+  // graphx.load() must be called first
   graphx.g3D.MAX_LIGHTS = 20;
-
   graphx.g3D.ShaderProgram3D = function(options, base) {
     options = options || {};
     options.attribs = options.attribs || {};
@@ -305,17 +333,53 @@
     options.uniforms.uProductsShininess = { length: graphx.g3D.MAX_LIGHTS, type: gl.FLOAT };
     options.uniforms.uLightPositions = { length: graphx.g3D.MAX_LIGHTS, type: gl.FLOAT_VEC3 };
 
+    if (!window.dali.isDaliObj(options.vShader) || !options.vShader.isType('vertex')) {
+      options.vShader = graphx.Shader({
+        type: gl.VERTEX_SHADER,
+        code: graphx.g3D.vShaderCodeDefault
+      });
+    }
+
+    if (!window.dali.isDaliObj(options.fShader) || !options.fShader.isType('fragment')) {
+      options.fShader = graphx.Shader({
+        type: gl.FRAGMENT_SHADER,
+        code: graphx.g3D.fShaderCodeDefault
+      });
+    }
+
     var self = graphx.ShaderProgram(options, base);
     self.setType('shaderprogram3d');
 
+    self.setToDefault = function() {
+      shader3d = self;
+    };
+
+    if (options.default != null && options.default == true)
+      self.setToDefault();
+
+    var camera;
     self.init = function() {
-      if (mainCamera3d == null) graphx.g3D.Camera();
-    }
+      if (mainCamera3d == null && camera == null)
+        self.setCamera(graphx.g3D.Camera());
+      else if (camera == null)
+        self.setCamera(mainCamera3d);
+      self.createSetters();
+
+      for (var mesh of meshMap.values()) {
+        mesh.initBuffers();
+      }
+    };
+
+    self.setCamera = function(_camera) {
+      if (window.dali.isDaliObj(_camera) && _camera.isType('camera3d')) {
+        camera = _camera;
+      } else console.log('Cannot use ' + _camera + ' object for 3D camera');
+    };
 
     self.render = function() {
       // TODO
       self.use();
-      self.setUniform('uEyePosition', mainCamera3d.transform.getPosition().vec3());
+      self.setUniform('uEyePosition', camera.transform.getPosition().vec3());
 
       var lights = light3ds.iterator();
       var light;
@@ -326,6 +390,21 @@
         self.setUniform('uLightPositions[' + i + ']', light.transform.getPosition().vec3());
       }
 
+      var map = requests.opaque;
+      var mesh, queue, attribs;
+      for (var meshId of map.keys()) {
+        mesh = meshMap.get(meshId);
+        attribs = mesh.getAttribs();
+        for (var key in attribs) {
+          if (attribs.hasOwnProperty(key)) {
+            self.setAttrib(key, attribs[key]);
+          }
+        }
+        queue = map.get(meshId);
+        for (var request of queue) {
+          // TODO
+        }
+      }
       /**
        *    get all opaque drawables that requested to draw associated with program
        *    for each model of drawables
@@ -337,11 +416,58 @@
        */
     };
 
+    var requests = {
+      // TODO add some sort of mesh priority queue
+      opaque: new Map(),
+      translucent: new Map()
+    };
+
+    var meshMap = new Map();
+    self.addMesh = function(mesh) {
+      if (!window.dali.isDaliObj(mesh) || !mesh.isType('mesh'))
+        throw 'Invalid mesh object: ' + mesh;
+      if (!meshMap.has(mesh.dGUID))
+        throw 'Mesh GUID collision ' + mesh.dGUID;
+      meshMap.set(mesh.dGUID, mesh);
+    };
+
+    self.requestRender = function(options) {
+      if (options == null || options.isOpaque == null || options.meshId == null || options.request == null)
+        throw 'Invalid render request options: ' + options;
+
+      var map;
+      if (options.isOpaque)
+        map = requests.opaque;
+      else
+        map = requests.translucent;
+
+      if (!map.has(options.meshId))
+        map.set(options.meshId, []);
+
+      // TODO error check for request
+      /**
+       * request
+       * { texture, material, transform }
+       */
+      map.get(options.meshId).push(options.request);
+    };
+
+    self.clearRequests = function() {
+      for (var key of requests.opaque.keys()) {
+        requests.opaque.set(key, []);
+      }
+      for (var key of requests.translucent.keys()) {
+        requests.translucent.set(key, []);
+      }
+    };
+
     return self;
   };
 
+  // graphx.load must be called first
   var mainCamera3d;
   // CAMERA ENTITY
+  // TODO Camera base class, children: Perspective, Orthographic
   graphx.g3D.Camera = function(options, base) {
     var self = window.dali.Entity(options, base);
     self.setType('camera3d');
@@ -449,6 +575,10 @@
       self.updateViewMatrix();
     };
 
+    self.reset = function(options) {
+      init(options);
+    };
+
     return self;
   };
 
@@ -457,13 +587,14 @@
     var self = window.dali.Entity(options, base);
     self.setType('light3d');
     self.color = graphx.Color(options);
-    light3ds.add(self);
-
-    // TODO
+    if (light3ds.size() < graphx.g3D.MAX_LIGHTS)
+      light3ds.add(self);
+    else throw 'Cannot add more lights...';
 
     return self;
   };
 
+  // graphx.load must be called first
   graphx.g3D.Texture = function(options, base) {
     var self = window.dali.Object(base);
     self.setType('texture3d');
@@ -491,19 +622,57 @@
       createSolidTexture(options.r, options.g, options.b, options.a);
     } else throw 'Invalid options: ' + options;
 
+    self.isTranslucent = function() {
+      return false; // TODO check for transparency in image using hidden canvas
+    };
+
     return self;
   };
 
+  // graphx.init() must be called before creating renderables
   graphx.g3D.Renderable3D = function(options, base) {
     var self = window.dali.Renderable(base);
     self.setType('renderable3d');
 
-    // TODO must contain a Model, a Texture, and a Material
+    if (options == null) throw 'Undefined options: ' + options;
+
+    var model, texture, material, shaderGuid;
+    if (window.dali.isDaliObj(options.model) && options.model.isType('model'))
+      model = options.model;
+    else throw 'No model given: ' + options;
+
+    if (window.dali.isDaliObj(options.texture) && options.texture.isType('texture3d'))
+      texture = options.texture;
+    else texture = graphx.g3D.Texture({r: 255, g: 255, b: 255, a: 255 }); // default texture
+
+    if (window.dali.isDaliObj(options.material) && options.material.isType('material'))
+      material = options.material;
+    else material = graphx.Material(); // default material
+
+    if (shaders.hasObj(options.shaderGuid))
+      shaderGuid = options.shaderGuid;
+    else
+      shaderGuid = shader3d.dGUID;
+
+    self.requestRender = function() {
+      var opts = {
+        isOpaque: !material.isTranslucent() && !texture.isTranslucent(),
+        meshId: model.meshId,
+        request: {
+          transform: model.getTransform(),
+          'texture': texture,
+          'material': material
+        },
+      };
+      requestRender(opts, shaderGuid);
+    };
 
     return self;
   };
 
   // MODEL FOR DRAWERS
+  // Meshes must be made before models
+  // prereq: init
   graphx.g3D.Model = function(options, base) {
     var self = window.dali.Object(base);
     self.setType('model');
@@ -511,22 +680,40 @@
     if (options == null)
       throw 'No options given for model';
 
-    if (options.mesh == null || options.mesh.inherit == null || !/mesh/i.test(options.mesh.inherit))
-      throw 'Invalid mesh object: ' + options.mesh;
+    if (!window.dali.isString(options.meshId))
+      throw 'Invalid meshId: ' + options.meshId;
 
-    var mesh = options.mesh;
+    self.meshId = options.meshId;
+
+    if (!window.dali.isDaliObj(options.eTransform) || !options.eTransform.isType('entitytransform'))
+      throw 'Invalid entity transform object: ' + options.eTransform;
+
+    var eTransform = options.eTransform;
     var transform = mat4.create();
     mat4.idenity(transform);
     // TODO make model transform from initial position, rotation, scale of model
+    mat4.fromRotationTranslationScaleOrigin(
+      transform, 
+      options.rotation || quat.fromValues(-0, 0, 0, 1),
+      options.position || vec3.fromValues(0, 0, 0),
+      options.scale || vec3.fromValues(1, 1, 1),
+      vec3.fromValues(0, 0, 0) // TODO change to position?
+    );
+
+    self.getTransform = function() {
+      var parent = eTransform.toMatrix();
+      mat4.multiply(parent, transform, parent);
+      return parent;
+    };
 
     return self;
   };
 
   // MESH
+  // prereq: load
   graphx.g3D.Mesh = function(options, base) {
     var self = window.dali.Object(base);
     self.setType('mesh');
-
 
     var bufferInfo;
     /** TODO createBufferInfo object
@@ -550,15 +737,29 @@
      *     };
      *
      */
-    self.createBufferInfo = function(data) {
-      data = data.data || data;
 
+    self.initBuffers = function() {
+      var data = self.triangleData();
+      createBufferInfo(data);
+    };
+
+    function createBufferInfo(data) {
+      data = data.data || data;
+      var attribs = createAttribs(data);
+
+      // TOOD
 
     };
 
     function createAttribs(data) {
-
+      // TODO
     }
+
+    self.triangleData = function() {
+      throw 'Not yet implemented ' + self.getType() + '.triangleData';
+    };
+
+    self.getAttribs = function () { return bufferInfo.attribs; };
 
     return self;
   };
@@ -575,6 +776,10 @@
     // TODO
 
     return self;
+  };
+
+  graphx.g3D.BoxMesh = function(options, base) {
+    // TODO
   };
 
   // TRIMESH

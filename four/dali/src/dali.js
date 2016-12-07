@@ -19,8 +19,9 @@ objTypes.forEach(function(type) {
 });
 delete objTypes;
 
+const daliReg = new RegExp('dali', 'i');
 dali.isDaliObj = function(obj) {
-  return obj != null && obj.dGUID != null && obj.getType != null && obj.inherit != null && /dali/i.test(obj.inherit);
+  return obj != null && obj.dGUID != null && obj.getType != null && obj.inherit != null && daliReg.test(obj.inherit);
 };
 
 // GUID GENERATOR
@@ -58,6 +59,11 @@ dali.isDaliObj = function(obj) {
     };
     self.getType = function () { return type; }
     self.setType('object');
+    self.isType = function(type) {
+      if (dali.isString(type))
+        return (new RegExp(type.toLowerCase(), 'i')).test(self.inherit);
+      return false;
+    };
 
     return self;
   };
@@ -73,22 +79,27 @@ dali.ObjectManager = function(objType, base) {
   self.setType('objectmanager');
   var regex = new RegExp(objType.toLowerCase(), 'i');
   var objects = new Map();
-  var queue = [];
+  var typeMap = new Map();
+  var queue = []; // TODO make it a priority queue
 
   function checkType(type) {
-    if (dali.isString(type) && !objects.has(type))
-      objects.set(type, new Map());
+    if (dali.isString(type) && !typeMap.has(type))
+      typeMap.set(type, []);
+  }
+
+  function checkGuid(guid) {
+    if (!dali.isString(guid)) throw 'Invalid guid ' + guid;
+    if (objects.has(guid)) throw 'GUID collision: ' + guid;
   }
 
   // public
   self.add = function (object) {
     if (dali.isDaliObj(object) && regex.test(object.inherit)) {
       checkType(object.getType());
-      var guidMap = objects.get(object.getType());
-      if (guidMap.has(object.dGUID))
-        throw 'GUID collision';
-      guidMap.set(object.dGUID, object);
-      queue.push({ guid: object.dGUID, type: object.getType() });
+      checkGuid(object.dGUID);
+      typeMap.get(object.getType()).push(object.dGUID);
+      objects.set(object.dGUID, object);
+      queue.push({ guid: object.dGUID }); // TODO
       return ;
     }
     throw ('Cannot insert: ' + object);
@@ -96,28 +107,39 @@ dali.ObjectManager = function(objType, base) {
 
   self.size = function() { return queue.length; };
 
-  self.getObj = function (type, guid) {
-    if (type != null && dali.isNumber(type) && guid == null && type < queue.length && type > -1) {
-      var info = queue[type];
-      type = info.type;
+  self.hasObj = function (guid) {
+    return guid != null && dali.isString(guid) && objects.has(guid);
+  };
+
+  self.getObj = function (guid) {
+    if (guid != null && dali.isNumber(guid) && guid < queue.length && guid > -1) {
+      var info = queue[guid];
       guid = info.guid;
     }
+    if (self.hasObj(guid))
+      return objects.get(guid);
+    throw ('Does not contain an Object with guid: \'' + guid + '\'');
+  };
 
-    if (type != null && dali.isString(type) && objects.has(type)) {
-      if (guid != null && dali.isString(guid) && objects.has(guid))
-        return objects.get(type).get(guid);
-      else {
-        var first = objects.get(type).values().next();
-        if (!first.done) return first.value;
-      }
-    }
-    throw ('Does not contain an Object of type: \'' + type + '\'');
+  self.getObjByType = function(type) {
+    if (type == null || !dali.isString(type) || !typeMap.has(type))
+      throw ('Does not contain an Object of type: \'' + type + '\'');
+
+    var list = typeMap.get(type);
+    if (list.length < 1) throw ('Does not contain an Object of type: \'' + type + '\'');
+    return list[0];
   };
 
   self.getObjs = function(type) {
-    if (type != null && dali.isString(type) && objects.has(type))
-      return objects.get(type).values();
-    throw ('Does not contain an Object of type: \'' + type + '\'');
+    if (type != null && dali.isString(type) && typeMap.has(type)) {
+      var guidList = typeMap.get(type);
+      var out = [];
+      for (var guid of guidList) {
+        out.push(objects.get(guid));
+      }
+      return out;
+    }
+    throw ('Does not contain Objects of type: \'' + type + '\'');
   };
 
   self[Symbol.iterator] = function() {
@@ -268,7 +290,7 @@ dali.EntityTransform = function (options, base, parent) {
       rotation.quat(),
       position.vec3(),
       scale.vec3(),
-      vec3.fromValues(0, 0, 0)
+      vec3.fromValues(0, 0, 0) // TODO change to position?
     );
     if (self.parent != null)
       mat4.multiply(t, self.parent.toMatrix(), t);

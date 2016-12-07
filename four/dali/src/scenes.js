@@ -41,25 +41,21 @@
 
     // public
     self.addScene = function (scene) {
-      var index = {
-        type: scene.getType(),
-        guid: scene.dGUID,
-      };
       scenes.add(scene);
-      sceneOrder.push(index);
+      sceneOrder.push(scene.dGUID);
     };
 
     self.next = function() {
       var next = sceneOrder.shift();
       sceneOrder.push(next);
-      currentScene = scenes.getObj(next.type, next.guid);
+      currentScene = scenes.getObj(next);
       return currentScene;
     };
 
     self.prev = function() {
       var prev = sceneOrder.pop();
       sceneOrder.unshift(prev);
-      currentScene = scenes.getObj(prev.type, prev.guid);
+      currentScene = scenes.getObj(prev);
       return currentScene;
     };
 

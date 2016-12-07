@@ -7,7 +7,7 @@
     var self = dali.Object(base);
     self.setType('resourcemanager');
 
-// TODO edit
+    // TODO edit
     // used for loading images to be used as textures
     function loadTexture(obj, url) {
       return new Promise(function(resolve, reject) {
