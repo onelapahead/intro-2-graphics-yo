@@ -1,6 +1,6 @@
 
 // Rendering engine and interface
-
+// helpful source: http://webglfundamentals.org/webgl/lessons/webgl-boilerplate.html
 (function () {
 
 // WebGL Utilities and Wrappers
@@ -402,8 +402,8 @@
       var specular = vec3.create();
 
       for (var meshId of map.keys()) {
-
         mesh = meshMap.get(meshId);
+        console.log(mesh.getType());
         bufferInfo = mesh.getBufferInfo();
         for (var key in bufferInfo.attribs) {
           if (bufferInfo.attribs.hasOwnProperty(key)) {
@@ -472,6 +472,8 @@
     self.requestRender = function(options) {
       if (options == null || options.isOpaque == null || options.meshId == null || options.request == null)
         throw 'Invalid render request options: ' + options;
+
+      console.log(options.request);
 
       var map;
       if (options.isOpaque)
@@ -554,10 +556,10 @@
       else
         lookUp = vec3.fromValues(0, 1, 0);
 
-      self.transform.setRotationFromAxes({
-        at: lookAt,
-        up: lookUp
-      });
+      // self.transform.setRotationFromAxes({
+      //   at: lookAt,
+      //   up: lookUp
+      // });
 
       eyeDistance = options.eyeDistance || 0.5;       
     }
@@ -771,10 +773,10 @@
     self.setType('mesh');
 
     var bufferInfo;
-    /** TODO createBufferInfo object
+    /**
      *     var arrays = {
      *       position: { numComponents: 3, data: [0, 0, 0, 10, 0, 0, 0, 10, 0, 10, 10, 0], },
-     *       aVertexTextureCoords: { numComponents: 2, data: [0, 0, 0, 1, 1, 0, 1, 1],                 },
+     *       aVertexTextureCoords: { numComponents: 2, data: [0, 0, 0, 1, 1, 0, 1, 1],     },
      *       normal:   { numComponents: 3, data: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],     },
      *       indices:  { numComponents: 3, data: [0, 1, 2, 1, 2, 3],                       },
      *     };
@@ -841,7 +843,50 @@
   // PLANEMESH
 
   graphx.g3D.PlaneMesh = function(options, base) {
+    var self = graphx.g3D.Mesh(base);
+    self.setType('planemesh');
+    
+    // TODO make generatable
 
+    self.triangleData = function() {
+      return {
+        aVertexPosition: {
+          size: 3,
+          data: [
+            -0.5, 0, -0.5, // LL
+            -0.5, 0, 0.5, // UL
+            0.5, 0, -0.5, // LR
+            0.5, 0, 0.5 // UR
+          ],
+        },
+        aVertexNormal: {
+          size: 3,
+          data: [
+            0, 1, 0, // LL
+            0, 1, 0, // UL
+            0, 1, 0, // LR
+            0, 1, 0 // UR
+          ],
+        },
+        aVertexTextureCoords: {
+          size: 2,
+          data: [
+            0, 0, // LL
+            0, 1, // UL
+            1, 0, // LR
+            1, 1 // UR
+          ],
+        },
+        indices: {
+          size: 3,
+          data: [
+            0, 1, 2, // triangle1
+            3, 2, 1 // triangle2
+          ],
+        },
+      };
+    };
+    return self;
   };
 
   // CUBEMESH

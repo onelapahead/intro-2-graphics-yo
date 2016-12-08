@@ -28,7 +28,7 @@ function main() {
     transform: {
       options: {
         position: {
-          x: 0.5, y:0.5, z: -0.5,
+          x: 0.5, y: 0.5, z: -0.5,
         },
       }
     },
@@ -48,7 +48,7 @@ function main() {
     transform: {
       options: {
         position: {
-          x: 2, y: 4.0, z: -0.5
+          x: 0.5, y: 1.5, z: 0.5
         },
       },
       parent: null,
@@ -63,6 +63,9 @@ function main() {
   
   var sphereMesh = dali.graphx.g3D.SphereMesh();
   shader.addMesh(sphereMesh);
+
+  var planeMesh = dali.graphx.g3D.PlaneMesh();
+  shader.addMesh(planeMesh);
 
   // initalize shader programs, b/c none were added,
   // creates default 3d per-pixel lighting shader
@@ -111,6 +114,48 @@ function main() {
 
   o.addRenderable(renderer);
   scene.addEntity(o);
+
+
+  o = dali.Entity({
+    transform: {
+      options: {
+        position: {
+          x: 0.5, y: 0.0, z: 0.5,
+        },
+        scale: {
+          x: 2.0, y: 1.0, z: 1.0
+        },
+        // axes: {
+        //   up: vec3.fromValues(0, 0, -1),
+        //   at: vec3.fromValues(0, 1, 0)
+        // }
+      }
+    }
+  });
+  mat = dali.graphx.Material({
+    ambient: [0.1, 0.1, 0.1],
+    diffuse: [0.6, 0.0, 0.6],
+    specular: [0.3, 0.3, 0.3],
+    alpha: 1.0,
+    shininess: 32.0,
+  });
+  texture = dali.graphx.g3D.Texture({
+    r: 255, b: 255, g: 255, a: 255
+  });
+  model = dali.graphx.g3D.Model({
+    meshId: planeMesh.dGUID,
+    eTransform: o.transform,
+  });
+
+  renderer = dali.graphx.g3D.Renderable3D({
+    'material': mat,
+    'texture': texture,
+    'model': model
+  });
+
+  o.addRenderable(renderer);
+  scene.addEntity(o);
+
 
   // for (var i = 0; i < 10; i++) {
   //   var o = dali.Entity({secret: i});
