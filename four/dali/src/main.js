@@ -48,7 +48,7 @@ function main() {
     transform: {
       options: {
         position: {
-          x: 0.5, y: 1.5, z: 0.5
+          x: 2.0, y: 4.0, z: -0.5
         },
       },
       parent: null,
@@ -120,15 +120,16 @@ function main() {
     transform: {
       options: {
         position: {
-          x: 0.5, y: 0.0, z: 0.5,
+          x: 0.5, y: 0.5, z: 1.0,
         },
         scale: {
-          x: 2.0, y: 1.0, z: 1.0
+          x: 1.0, y: 1.0, z: 2.0
         },
-        // axes: {
-        //   up: vec3.fromValues(0, 0, -1),
-        //   at: vec3.fromValues(0, 1, 0)
-        // }
+        axes: {
+          x: -90.0,
+          y: 0.0,
+          z: 0.0,
+        }
       }
     }
   });

@@ -252,14 +252,21 @@ dali.EntityTransform = function (options, base, parent) {
 
   self.setRotationFromAxes = function(axes) {
     axes = axes || {};
-    axes.up = axes.up || vec3.fromValues(0, 1, 0);
-    axes.at = axes.at || vec3.fromValues(0, 0, 1);
+    axes.x = axes.x || 0.0; // degrees
+    axes.y = axes.x || 0.0; // degrees
+    axes.z = axes.z || 0.0; // degrees
+    var up = vec3.fromValues(0, 1, 0);
+    var at = vec3.fromValues(0, 0, 1);
 
     var right = vec3.create();
-    vec3.cross(right, axes.up, axes.at);
+    vec3.cross(right, up, at);
 
     var rot = quat.create();
-    quat.setAxes(rot, axes.at, right, axes.up);
+    quat.setAxes(rot, at, right, up);
+
+    quat.rotateX(rot, rot, axes.x * Math.PI / 180.0);
+    quat.rotateY(rot, rot, axes.y * Math.PI / 180.0);
+    quat.rotateZ(rot, rot, axes.z * Math.PI / 180.0);
 
     self.setRotationFromQuat(rot);
   };
