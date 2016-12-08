@@ -48,6 +48,8 @@
 
   // prereq: init
   graphx.render = function() {
+    gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
+
     var shader;
     for (var shaderInfo of shaderQueue) {
       shader = shaders.getObj(shaderInfo.guid);
@@ -91,7 +93,7 @@
     }
 
     function setColorFromOptions(field, options) {
-      if (options[field] != null && window.dali.isArray(options[field]) && options[field].length == 3)
+      if (options != null && options[field] != null && window.dali.isArray(options[field]) && options[field].length == 3)
         setColor(options[field], field);
       else
         setColor([1, 1, 1], field);
@@ -118,17 +120,14 @@
     var self = window.dali.Object(graphx.Color(options));
     self.setType('material');
 
-    function setExponent(n) {
-      if (n != null && window.dali.isNumber(n))
-        self.n = n;
-      else
-        self.n = DEFAULT_MATERIAL_SHININESS;
-    }
+    options = options || {};
 
-    // TODO alpha
+    self.shininess = options.shininess || DEFAULT_MATERIAL_SHININESS;
+    self.alpha = options.alpha || 1.0;
 
-    if (options == null) setExponent();
-    else setExponent(options.n);
+    self.isTranslucent = function() {
+      return self.alpha < 1.0;
+    };
 
     return self;
   };
@@ -247,14 +246,17 @@
 
     function createAttribSetter(aLoc, aName) {
       return function (buffer) {
-        gl.bindBuffer(buffer);
-        gl.enableVertexArray(aLoc);
+        console.log(buffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        // gl.enableVertexAttrib(aLoc);
+        gl.enableVertexAttribArray(aLoc);
         gl.vertexAttribPointer(aLoc, attribs[aName], gl.FLOAT, false, 0, 0);
       };
     }
 
     self.setAttrib = function(aName, buffer) {
       // TODO error check
+      console.log(aName);
       attribSetters[aName](buffer);
     };
 
@@ -330,7 +332,7 @@
     options.uniforms.uProductsAmbient = { length: graphx.g3D.MAX_LIGHTS, type: gl.FLOAT_VEC3 };
     options.uniforms.uProductsDiffuse = { length: graphx.g3D.MAX_LIGHTS, type: gl.FLOAT_VEC3 };
     options.uniforms.uProductsSpecular = { length: graphx.g3D.MAX_LIGHTS, type: gl.FLOAT_VEC3 };
-    options.uniforms.uProductsShininess = { length: graphx.g3D.MAX_LIGHTS, type: gl.FLOAT };
+    options.uniforms.uShininess = gl.FLOAT;
     options.uniforms.uLightPositions = { length: graphx.g3D.MAX_LIGHTS, type: gl.FLOAT_VEC3 };
 
     if (!window.dali.isDaliObj(options.vShader) || !options.vShader.isType('vertex')) {
@@ -377,7 +379,6 @@
     };
 
     self.render = function() {
-      // TODO
       self.use();
       self.setUniform('uEyePosition', camera.transform.getPosition().vec3());
 
@@ -385,35 +386,72 @@
       var light;
       self.setUniform('uNumLights', light3ds.size());
       for (var i = 0; i < light3ds.size(); i++) {
-        console.log('Setting some lights' + i);
         light = lights.next().value;
+        console.log('Setting some lights ' + light.transform.getPosition().vec3());
         self.setUniform('uLightPositions[' + i + ']', light.transform.getPosition().vec3());
       }
 
+
+      gl.depthMask(true); // z-buffer on
       var map = requests.opaque;
-      var mesh, queue, attribs;
+      var mesh, queue, bufferInfo;
+      var material, texture, mMatrix;
+      var hpvmMatrix = mat4.create();
+      var ambient = vec3.create();
+      var diffuse = vec3.create();
+      var specular = vec3.create();
+
       for (var meshId of map.keys()) {
+
         mesh = meshMap.get(meshId);
-        attribs = mesh.getAttribs();
-        for (var key in attribs) {
-          if (attribs.hasOwnProperty(key)) {
-            self.setAttrib(key, attribs[key]);
+        bufferInfo = mesh.getBufferInfo();
+        for (var key in bufferInfo.attribs) {
+          if (bufferInfo.attribs.hasOwnProperty(key)) {
+            self.setAttrib(key, bufferInfo.attribs[key].buffer);
           }
         }
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufferInfo.indices);
+
         queue = map.get(meshId);
+                console.log(queue);
         for (var request of queue) {
           // TODO
+          material = request.material;
+          texture = request.texture;
+          mMatrix = request.transform;
+
+          mat4.multiply(hpvmMatrix, camera.hpvMatrix, mMatrix);
+
+          self.setUniform('umMatrix', mMatrix);
+          self.setUniform('upvmMatrix', hpvmMatrix);
+          self.setUniform('uShininess', material.shininess);
+          self.setUniform('uAlpha', material.alpha);
+          self.setUniform('uTexture', texture.getTexture());
+
+          lights = light3ds.iterator();
+          for (var i = 0; i < light3ds.size(); i++) {
+            light = lights.next().value;
+
+            console.log(light.color);
+            console.log(material);
+            vec3.multiply(ambient, light.color.ambient, material.ambient);
+            vec3.multiply(diffuse, light.color.diffuse, material.diffuse);
+            vec3.multiply(specular, light.color.specular, material.specular);
+
+            console.log(ambient);
+            console.log(diffuse);
+            console.log(specular);
+
+            self.setUniform('uProductsAmbient[' + i + ']', ambient);
+            self.setUniform('uProductsDiffuse[' + i + ']', diffuse);
+            self.setUniform('uProductsSpecular[' + i + ']', specular);
+          }
+
+          gl.drawElements(gl.TRIANGLES, bufferInfo.size, gl.UNSIGNED_SHORT, 0);
+
         }
-      }
-      /**
-       *    get all opaque drawables that requested to draw associated with program
-       *    for each model of drawables
-       *      bind model position/normal/uv buffers to attributes
-       *      for each texture of textures assoicated with model
-       *        for each drawable with texture, model, shader
-       *          render
-       *    repeat for transparent objects with z-buffering off
-       */
+      };
     };
 
     var requests = {
@@ -426,7 +464,7 @@
     self.addMesh = function(mesh) {
       if (!window.dali.isDaliObj(mesh) || !mesh.isType('mesh'))
         throw 'Invalid mesh object: ' + mesh;
-      if (!meshMap.has(mesh.dGUID))
+      if (meshMap.has(mesh.dGUID))
         throw 'Mesh GUID collision ' + mesh.dGUID;
       meshMap.set(mesh.dGUID, mesh);
     };
@@ -490,8 +528,8 @@
     function setProjection(options) {
       options = options || {};
       projection = {
-        fovY: options.fovY || 0.5 * Math.PI,
-        near: options.near || 1,
+        fovY: options.fovY || 0.25 * Math.PI,
+        near: options.near || 0.1,
         far: options.far || 10,
         aspect: gl.canvas.width / gl.canvas.height,
       };
@@ -521,7 +559,7 @@
         up: lookUp
       });
 
-      eyeDistance = options.eyeDistance || 1.0;       
+      eyeDistance = options.eyeDistance || 0.5;       
     }
 
     self.updateHandProjMatrix = function() {
@@ -551,9 +589,9 @@
       vec3.scale(Center, Center, eyeDistance);
       vec3.add(Center, Eye, Center);
 
-      // console.log(Eye);
-      // console.log(Center);
-      // console.log(Up);
+      console.log(Eye);
+      console.log(Center);
+      console.log(Up);
 
       mat4.lookAt(vMatrix, Eye, Center, Up);
       mat4.multiply(self.hpvMatrix, hpMatrix, vMatrix);
@@ -626,6 +664,10 @@
       return false; // TODO check for transparency in image using hidden canvas
     };
 
+    self.getTexture = function() {
+      return glTexture;
+    };
+
     return self;
   };
 
@@ -690,11 +732,24 @@
 
     var eTransform = options.eTransform;
     var transform = mat4.create();
-    mat4.idenity(transform);
+
+    if (options.rotation == null) {
+      var up = vec3.fromValues(0, 1, 0);
+      var at = vec3.fromValues(0, 0, 1);
+
+      var right = vec3.create();
+      vec3.cross(right, up, at);
+
+      var rot = quat.create();
+      quat.setAxes(rot, at, right, up);
+
+      options.rotation = rot;
+    }
+
     // TODO make model transform from initial position, rotation, scale of model
     mat4.fromRotationTranslationScaleOrigin(
       transform, 
-      options.rotation || quat.fromValues(-0, 0, 0, 1),
+      options.rotation,
       options.position || vec3.fromValues(0, 0, 0),
       options.scale || vec3.fromValues(1, 1, 1),
       vec3.fromValues(0, 0, 0) // TODO change to position?
@@ -719,7 +774,7 @@
     /** TODO createBufferInfo object
      *     var arrays = {
      *       position: { numComponents: 3, data: [0, 0, 0, 10, 0, 0, 0, 10, 0, 10, 10, 0], },
-     *       texcoord: { numComponents: 2, data: [0, 0, 0, 1, 1, 0, 1, 1],                 },
+     *       aVertexTextureCoords: { numComponents: 2, data: [0, 0, 0, 1, 1, 0, 1, 1],                 },
      *       normal:   { numComponents: 3, data: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],     },
      *       indices:  { numComponents: 3, data: [0, 1, 2, 1, 2, 3],                       },
      *     };
@@ -745,35 +800,103 @@
 
     function createBufferInfo(data) {
       data = data.data || data;
-      var attribs = createAttribs(data);
-
-      // TOOD
-
+      bufferInfo = {};
+      bufferInfo.attribs = createAttribs(data);
+      bufferInfo.size = data.indices.data.length;
+      bufferInfo.indices = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufferInfo.indices);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(data.indices.data), gl.STATIC_DRAW);
+      console.log(bufferInfo);
+      return bufferInfo;
     };
 
     function createAttribs(data) {
-      // TODO
+      var out = {};
+      for (var key in data) {
+        if (data.hasOwnProperty(key) && key != 'indices') {
+          out[key] = createBuffer(data[key]);
+        }
+      }
+      return out;
+    }
+
+    function createBuffer(obj) {
+      var out = {};
+      out.buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, out.buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(obj.data), gl.STATIC_DRAW);
+      out.size = obj.size;
+      return out;
     }
 
     self.triangleData = function() {
       throw 'Not yet implemented ' + self.getType() + '.triangleData';
     };
 
-    self.getAttribs = function () { return bufferInfo.attribs; };
+    self.getBufferInfo = function () { return bufferInfo; };
 
     return self;
   };
 
   // PLANEMESH
 
+  graphx.g3D.PlaneMesh = function(options, base) {
+
+  };
+
   // CUBEMESH
 
   // SPHEREMESH
   graphx.g3D.SphereMesh = function(options, base) {
-    var self = window.dali.Mesh(base);
+    var self = graphx.g3D.Mesh(base);
     self.setType('spheremesh');
+    options = options || {};
+    var numBands = options.numBands || 32;
+    if (numBands % 2 != 0) numBands++;
+    self.dGUID = self.getType() + '.' + numBands;
 
-    // TODO
+    self.triangleData = function() {
+      var data = {
+        aVertexPosition: { size: 3, data: [] },
+        aVertexNormal: { size: 3, data: [] },
+        aVertexTextureCoords: { size: 2, data: [] },
+        indices: { size: 3, data: [] }
+      };
+
+      // make vertices and aVertexNormals
+      for (var latNumber = 0; latNumber <= numBands; latNumber++) {
+        var theta = latNumber * Math.PI / numBands;
+        var sinTheta = Math.sin(theta);
+        var cosTheta = Math.cos(theta);
+
+        for (var longNumber = 0; longNumber <= numBands; longNumber++) {
+          var phi = longNumber * 2 * Math.PI / numBands;
+          var sinPhi = Math.sin(phi);
+          var cosPhi = Math.cos(phi);
+
+          var x = cosPhi * sinTheta;
+          var y = cosTheta;
+          var z = sinPhi * sinTheta;
+          var u = (longNumber / numBands);
+          var v = (latNumber / numBands);
+
+          data.aVertexTextureCoords.data.push(u, v);
+          data.aVertexPosition.data.push(x, y, z);
+        }
+      }
+      data.aVertexNormal.data = data.aVertexPosition.data.slice(); // for this sphere, vertices = normals; return these
+
+      // make triangles, from south pole to middle latitudes to north pole
+      for (var latNumber = 0; latNumber < numBands; latNumber++) {
+        for (var longNumber = 0; longNumber < numBands; longNumber++) {
+          var first = (latNumber * (numBands + 1)) + longNumber;
+          var second = first + numBands + 1;
+          data.indices.data.push(first, second, first + 1);
+          data.indices.data.push(second, second + 1, first + 1);
+        }
+      }
+      return data;
+    };
 
     return self;
   };
@@ -784,7 +907,7 @@
 
   // TRIMESH
   graphx.g3D.TriMesh = function(options, base) {
-    var self = window.dali.Mesh(base);
+    var self = graphx.g3D.Mesh(base);
     self.setType('trimesh');
 
     // TODO
@@ -875,7 +998,7 @@ dali.graphx.g3D.fShaderCodeDefault = `
   uniform vec3 uProductsAmbient[MAX_LIGHTS];
   uniform vec3 uProductsDiffuse[MAX_LIGHTS];
   uniform vec3 uProductsSpecular[MAX_LIGHTS];
-  uniform float uProductsShininess[MAX_LIGHTS];
+  uniform float uShininess;
 
   // geometry properties
   varying vec3 vWorldPos; // world xyz of fragment
@@ -887,17 +1010,18 @@ dali.graphx.g3D.fShaderCodeDefault = `
 
   void main(void) {
     vec3 color = vec3(0.0, 0.0, 0.0);
+
+    vec3 E = normalize(uEyePosition - vWorldPos);
+    vec3 n = normalize(vVertexNormal);
     for (int i = 0; i < MAX_LIGHTS; i++) {
       if (i >= uNumLights) break;
       vec3 L = normalize(uLightPositions[i] - vWorldPos);
-      vec3 E = normalize(uEyePosition - vWorldPos);
       vec3 H = normalize(L + E);
-      vec3 n = normalize(vVertexNormal);
 
       vec3 Idiff = uProductsDiffuse[i] * max(dot(n, L), 0.0);
       Idiff = clamp(Idiff, 0.0, 1.0);
 
-      vec3 Ispec = uProductsSpecular[i] * pow(max(dot(n, H), 0.0), 4.0 * uProductsShininess[i]);
+      vec3 Ispec = uProductsSpecular[i] * pow(max(dot(n, H), 0.0), uShininess);
       Ispec = clamp(Ispec, 0.0, 1.0);
 
       color = clamp(color + uProductsAmbient[i] + Idiff + Ispec, 0.0, 1.0);

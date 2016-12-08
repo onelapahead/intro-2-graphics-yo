@@ -1,9 +1,11 @@
-var static = require('node-static');
+var stat = require('node-static');
  
-var fileServer = new static.Server();
- 
+var fileServer = new stat.Server();
+var port = process.argv[2] || 3000;
 require('http').createServer(function (request, response) {
     request.addListener('end', function () {
         fileServer.serve(request, response);
     }).resume();
-}).listen(process.argv[2]);
+}).listen(port, function() {
+  console.log("listening on port " + port);
+});
