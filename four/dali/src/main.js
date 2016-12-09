@@ -7,7 +7,84 @@ var defaultMaterial = dali.graphx.Material({
   shininess: 32.0,
 });
 
-function Ground(textureUrl, meshId ,options) {
+function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
+  var self = dali.Entity({ 
+    transform: {
+      options: { 
+        position: {
+          x: center[0], y: center[1], z: center[2]
+        }
+      }
+    }
+  });
+  self.setType('groundgrid');
+
+  var numX = dimensions.x / step,
+      numZ = dimensions.z / step;
+  var sections = _sections;
+
+  var tiles = [];
+
+  var ll = {
+    x: center[0] - 0.5 * dimensions.x,
+    z: center[2] - 0.5 * dimensions.z,
+  };
+
+  // { zBound, texture, action? }
+  var section = sections[0];
+  var secPtr = 0, texture;
+  for (var i = 0; i <= numX; i++) {
+    tiles.push([]);
+    secPtr = 0;
+    section = sections[secPtr++];
+    for (var j = 0; j <= numZ; j++) {
+      if (j === section.zBound && secPtr < sections.length) {
+        section = sections[secPtr++];
+      }
+      if (secPtr == sections.length && i % 2 == 0)
+        texture = section.texture1;
+      else
+        texture = section.texture;
+
+      tiles[i].push(Ground(texture, boxMeshId, {
+        transform: { 
+          options: {
+            position: {
+              x: ll.x + i * step + step / 2,
+              y: -0.1,
+              z: ll.z + j * step + step / 2,
+            },
+            scale: {
+              x: step,
+              y: 0.1,
+              z: step,
+            }
+          }
+        },
+      }));
+    }
+  }
+
+  self.update = function(dt) {
+    for (var i = 0; i < numX; i++) {
+      for (var j = 0; j < numZ; j++) {
+        tiles[i][j]._update(dt);
+      }
+    }
+  };
+
+  self.requestRender = function() {
+    for (var i = 0; i < numX; i++) {
+      for (var j = 0; j < numZ; j++) {
+        tiles[i][j]._requestRender();
+      }
+    }
+  };
+
+  return self;
+}
+
+function Ground(textureUrl, meshId, options) {
   var self = dali.Entity(options);
 
   var texture = dali.graphx.g3D.Texture({
@@ -24,22 +101,33 @@ function Ground(textureUrl, meshId ,options) {
     'model': model
   });
 
+  // TODO collision rxn
+
   self.addRenderable(renderer);
 
   return self;
 }
 
-function Frog(meshId, options) {
+function Player(options) {
   var self = dali.Entity(options);
-  var mat = dali.graphx.Material({
-    ambient: [0.1, 0.1, 0.1],
-    diffuse: [0.2, 0.7, 0.3],
-    specular: [0.3, 0.3, 0.3],
-    alpha: 1.0,
-    shininess: 9.0,
-  });
+
+
+
+  return self;
+}
+
+function Frog(textureUrl, meshId, options) {
+  var self = dali.Entity(options);
+  // var mat = dali.graphx.Material({
+  //   ambient: [0.1, 0.1, 0.1],
+  //   diffuse: [0.2, 0.7, 0.3],
+  //   specular: [0.3, 0.3, 0.3],
+  //   alpha: 1.0,
+  //   shininess: 9.0,
+  // });
+  var mat = defaultMaterial;
   var texture = dali.graphx.g3D.Texture({
-    r: 255, b: 255, g: 255, a: 255
+    url: textureUrl
   });
   var model = dali.graphx.g3D.Model({
     meshId: meshId,
@@ -68,16 +156,21 @@ function Frog(meshId, options) {
   return self;
 }
 
-function Generator() {
+function Generator(object, meshId, speedLow, speedHigh, options) {
 //TODO
+  var self = dali.Entity(options);
+
+  return self;
 }
 
 function Log() {
 //TODO
 }
 
-function Car(meshId, options) {
+function Car(meshId, _speed, options) {
   var self = dali.Entity(options);
+
+  var speed = _speed;
 
   var texture = dali.graphx.g3D.Texture({
       r: 255, g: 0, b: 0, a: 255
@@ -100,7 +193,7 @@ function Car(meshId, options) {
 
     _self.update = function(dt) {
       var pos = self.transform.getPosition();
-      pos.x -= dt;
+      pos.x -= dt * speed;
     };
 
     return _self;
@@ -134,11 +227,17 @@ function main() {
     dali.graphx.render();
   }
 
+  // ESC to pause
   document.onkeydown = function(keyEvent) {
     console.log('yeah');
     if (keyEvent.code === 'Escape') {
-      console.log("STOP");
-      stop = true;
+      if (!stop) {
+        stop = true;
+      } else {
+        prev = performance.now();
+        stop = false;
+        requestAnimationFrame(loop);
+      }
     }   
   };
 
@@ -147,10 +246,14 @@ function main() {
       './img/asphalt_texture407.jpg',
       './img/grass-textures.jpg',
       './img/water.jpg',
-      './img/fire.jpg'
+      './img/fire.jpg',
+      // 'http://brix4dayz.github.io/img/profile.png', // CORS test
+      './img/HandleTex.png'
     ],
     text: [
       './meta/test.json',
+      './meta/DoubleDamageFrog.obj', 
+      // src: https://www.models-resource.com/pc_computer/roblox/model/12873/
     ]
   };
 
@@ -164,15 +267,17 @@ function main() {
   //   transform: {
   //     options: {
   //       position: {
-  //         x: 0.5, y: 0.5, z: -1.5,
+  //         x: 0.5, y: 1.0, z: 0.0,
   //       },
-  //     }
+  //     },
+  //     // parent: o.transform,
   //   },
-  //   lookAt: [0, 0, 1],
-  //   lookUp: [0, 1, 0],
+  //   lookAt: [0, -1, 0],
+  //   lookUp: [0, 0, 1],
   //   eyeDistance: 0.5,
   //   fovY: 0.5 * Math.PI,
   // });
+
   // scene.addEntity(camera);
 
   var shader = dali.graphx.g3D.ShaderProgram3D({
@@ -188,46 +293,99 @@ function main() {
     transform: {
       options: {
         position: {
-          x: 2.0, y: 4.0, z: -0.5
+          x: 0.0, y: 1.0, z: 0.0
         },
       },
       parent: null,
       base: null,
     },
     ambient: [1.0, 1.0, 1.0],
-    diffuse: [1, 1, 1],
-    specular: [1, 1, 1],
+    diffuse: [0.6, 0.6, 0.6],
+    specular: [0.3, 0.3, 0.3],
   });
   scene.addEntity(light);
-  
-  var sphereMesh = dali.graphx.g3D.SphereMesh();
-  shader.addMesh(sphereMesh);
 
-  var roadMesh = dali.graphx.g3D.PlaneMesh({
-    width: 10,
-    height: 5,
+  // light = dali.graphx.g3D.Light({
+  //   transform: {
+  //     options: {
+  //       position: {
+  //         x: 0.0, y: 1.0, z: 1.0
+  //       },
+  //     },
+  //     parent: null,
+  //     base: null,
+  //   },
+  //   ambient: [1.0, 1.0, 1.0],
+  //   diffuse: [0.6, 0.6, 0.6],
+  //   specular: [0.3, 0.3, 0.3],
+  // });
+  // scene.addEntity(light);
+
+  // light = dali.graphx.g3D.Light({
+  //   transform: {
+  //     options: {
+  //       position: {
+  //         x: 1.0, y: 1.0, z: 1.0
+  //       },
+  //     },
+  //     parent: null,
+  //     base: null,
+  //   },
+  //   ambient: [1.0, 1.0, 1.0],
+  //   diffuse: [0.6, 0.6, 0.6],
+  //   specular: [0.3, 0.3, 0.3],
+  // });
+  // scene.addEntity(light);
+
+  light = dali.graphx.g3D.Light({
+    transform: {
+      options: {
+        position: {
+          x: 1.0, y: 1.0, z: 0.0
+        },
+      },
+      parent: null,
+      base: null,
+    },
+    ambient: [1.0, 1.0, 1.0],
+    diffuse: [0.6, 0.6, 0.6],
+    specular: [0.3, 0.3, 0.3],
   });
-  shader.addMesh(roadMesh);
+  scene.addEntity(light);
 
-  var grassMesh = dali.graphx.g3D.PlaneMesh({
-    width: 10,
-    height: 1,
+  dali.resources.load(resources)
+  .then(function() {
+
+  var frogMesh = dali.graphx.g3D.TriMesh({
+    url: './meta/DoubleDamageFrog.obj'
   });
-  shader.addMesh(grassMesh);
+  shader.addMesh(frogMesh);
 
-  var waterMesh = dali.graphx.g3D.PlaneMesh({
-    width: 10,
-    height: 3,
-  });
-  shader.addMesh(waterMesh);
+  // var roadMesh = dali.graphx.g3D.PlaneMesh({
+  //   width: 10,
+  //   height: 5,
+  // });
+  // shader.addMesh(roadMesh);
 
-  var fireMesh = dali.graphx.g3D.PlaneMesh({
-    width: 2,
-    height: 2,
-  });
-  shader.addMesh(fireMesh);
+  // var grassMesh = dali.graphx.g3D.PlaneMesh({
+  //   width: 10,
+  //   height: 1,
+  // });
+  // shader.addMesh(grassMesh);
 
-  var carMesh = dali.graphx.g3D.BoxMesh({
+  // var waterMesh = dali.graphx.g3D.PlaneMesh({
+  //   width: 10,
+  //   height: 3,
+  // });
+  // shader.addMesh(waterMesh);
+
+  // var fireMesh = dali.graphx.g3D.PlaneMesh({
+  //   width: 2,
+  //   height: 2,
+  // });
+  // shader.addMesh(fireMesh);
+
+  var boxMesh = dali.graphx.g3D.BoxMesh({
     // width: 6,
     // height: 2,
     // depth: 2
@@ -236,7 +394,7 @@ function main() {
     depth: 1
     
   });
-  shader.addMesh(carMesh);
+  shader.addMesh(boxMesh);
 
   // initalize shader programs, b/c none were added,
   // creates default 3d per-pixel lighting shader
@@ -251,18 +409,16 @@ function main() {
   // console.log(camera);
 
   // load images, json, audio, etc.
-  dali.resources.load(resources)
-  .then(function() {
     // add scene objects
 
-    var o = Frog(sphereMesh.dGUID, {
+    var o = Frog('./img/HandleTex.png', frogMesh.dGUID, {
       transform: {
         options: {
           position: {
-            x: 0.5, y: 0.1, z: -0.8,
+            x: 1.0, y: 0.2, z: -1.0,
           },
           scale: {
-            x: 0.05, y: 0.05, z: 0.05
+            x: 0.2, y: 0.2, z: 0.2
           },
         }
       }
@@ -273,10 +429,10 @@ function main() {
       transform: {
         options: {
           position: {
-            x: 0, y: 0.75, z: -1.0,
-          },
+            x: 0.0, y: 0.75, z: -1.25,
+          }
         },
-        parent: o.transform,
+        parent: o.transform
       },
       lookAt: [0, 0, 1],
       lookUp: [0, 1, 0],
@@ -286,97 +442,22 @@ function main() {
     scene.addEntity(camera);
     shader.setCamera(camera);
 
-    o = Ground('./img/grass-textures.jpg', grassMesh.dGUID, {
-      transform: {
-        options: {
-          position: {
-            x: 0.5, y: 0, z: -0.8,
-          },
-          scale: {
-            x: 6.0, y: 1.0, z: 0.4
-          },
-        }
-      }
-    });
-    scene.addEntity(o);
+    var ground = GroundGrid(
+      { x: 4, y: 0, z: 4},
+      0.4,
+      [1.0, 0, 0.0],
+      [
+        { zBound: 1, texture: './img/grass-textures.jpg'},
+        { zBound: 4, texture: './img/asphalt_texture407.jpg'},
+        { zBound: 5, texture: './img/grass-textures.jpg' },
+        { zBound: 9, texture: './img/water.jpg' },
+        { zBound: 10, texture: './img/fire.jpg', texture1: './img/grass-textures.jpg' },
+      ],
+      boxMesh.dGUID
+    );
+    scene.addEntity(ground);
 
-
-    o = Ground('./img/asphalt_texture407.jpg', roadMesh.dGUID, {
-      transform: {
-        options: {
-          position: {
-            x: 0.5, y: 0, z: 0.01,
-          },
-          scale: {
-            x: 6.0, y: 1.0, z: 1.2
-          },
-        }
-      }
-    });
-    scene.addEntity(o);
-
-
-    o = Ground('./img/grass-textures.jpg', grassMesh.dGUID, {
-      transform: {
-        options: {
-          position: {
-            x: 0.5, y: 0, z: 0.77,
-          },
-          scale: {
-            x: 6.0, y: 1.0, z: 0.3
-          },
-        }
-      }
-    });
-    scene.addEntity(o);
-
-
-    o = Ground('./img/water.jpg', waterMesh.dGUID, {
-      transform: {
-        options: {
-          position: {
-            x: 0.5, y: 0, z: 1.2,
-          },
-          scale: {
-            x: 6.0, y: 1.0, z: 0.6
-          },
-        }
-      }
-    });
-    scene.addEntity(o);
-
-
-    for (var i = -2.4; i < 3.6; i+=0.6) {
-      o = Ground('./img/fire.jpg', fireMesh.dGUID, {
-        transform: {
-          options: {
-            position: {
-              x: i + 0.15, y: 0.1, z: 1.77,
-            },
-            scale: {
-              x: 0.3, y: 1.0, z: 0.3
-            },
-          }
-        }
-      });
-      scene.addEntity(o);   
-    }
-
-    o = Ground('./img/grass-textures.jpg', grassMesh.dGUID, {
-      transform: {
-        options: {
-          position: {
-            x: 0.5, y: 0.0, z: 1.85
-          },
-          scale: {
-            x: 6.0, y: 1.0, z: 0.3
-          }
-        }
-      }
-    });
-    scene.addEntity(o);
-
-    o = Car(carMesh.dGUID, {
+    o = Car(boxMesh.dGUID, 0.5, {
       transform: {
         options: {
           position: {

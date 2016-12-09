@@ -672,12 +672,12 @@
     return self;
   };
 
+  var texture3ds = window.dali.ObjectManager('texture3d');
   // graphx.load must be called first
   graphx.g3D.Texture = function(options, base) {
     var self = window.dali.Object(base);
     self.setType('texture3d');
-
-    if (options == null) throw 'Invalid options: ' + options;
+    if (options == null) throw 'Invalid texture1 options: ' + options;
 
     // creates a "texture" of a solid color. used to create the blank, default texture
     // 0 - 255
@@ -685,6 +685,7 @@
       if (!dali.isNumber(r) || !dali.isNumber(g) || !dali.isNumber(b) || !dali.isNumber(a))
         throw 'Invalid arguments to createSolidTexture';
       var data = new Uint8Array([r, g, b, a]);
+      if (a < 255) isTranslucent = true;
       glTexture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, glTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
@@ -693,7 +694,9 @@
       gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
+    var isTranslucent = false;
     function createImageTexture(img) {
+      isTranslucent = 
       glTexture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, glTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
@@ -705,15 +708,22 @@
 
     var glTexture;
     if (options.url != null) {
+      if (texture3ds.hasObj(options.url))
+        return texture3ds.getObj(options.url);
+
+      self.dGUID = options.url;
       var img = window.dali.resources.ResourceManager.main.getResource(options.url);
       createImageTexture(img.getImg());
+      isTranslucent = img.isTranslucent;
+      texture3ds.add(self);
+
       // TODO
     } else if (options.r != null && options.g != null && options.b != null && options.a != null) {
       createSolidTexture(options.r, options.g, options.b, options.a);
-    } else throw 'Invalid options: ' + options;
+    } else throw 'Invalid texture2 options: ' + options;
 
     self.isTranslucent = function() {
-      return false; // TODO check for transparency in image using hidden canvas
+      return isTranslucent; // TODO check for transparency in image using hidden canvas
     };
 
     self.getTexture = function() {
@@ -953,7 +963,7 @@
           data.aVertexTextureCoords.data.push(0,1);
 
           data.indices.data.push(triIndex, triIndex+1, triIndex+2);
-          data.indices.data.push(triIndex, triIndex+2, triIndex+3);
+          data.indices.data.push(triIndex+2, triIndex+3, triIndex);
           triIndex += 4;
         }
       }
@@ -1083,7 +1093,7 @@
             data.aVertexTextureCoords.data.push(0,1);
 
             data.indices.data.push(triIndex, triIndex+1, triIndex+2);
-            data.indices.data.push(triIndex, triIndex+2, triIndex+3);
+            data.indices.data.push(triIndex+2, triIndex+3, triIndex);
             triIndex += 4;
           }
         }
@@ -1121,10 +1131,118 @@
     return self;
   };
 
+  // adapted from frenchtoast747's webgl-obj-loader
+  // built its own buffers, so I needed to just get
+  // the parsing .obj function
+  //
+  // goes through a list of vertices, uvs, and normals
+  // then goes through list of faces, and maps vertex,
+  // uv, and normal to the same index... building the
+  // object that the Mesh bufferInfo object likes
+  //
+  // src:
+  //   https://github.com/frenchtoast747/webgl-obj-loader/blob/master/webgl-obj-loader.js
+  var MESH_FILE_RE = /\.[obj]/i;
+  var VERTEX_RE = /^v\s/;
+  var NORMAL_RE = /^vn\s/;
+  var TEXTURE_RE = /^vt\s/;
+  var FACE_RE = /^f\s/;
+  var WHITESPACE_RE = /\s+/;
   // TRIMESH
   graphx.g3D.TriMesh = function(options, base) {
     var self = graphx.g3D.Mesh(base);
     self.setType('trimesh');
+
+    console.log(self.dGUID);
+    if (options == null || options.url == null || !window.dali.isString(options.url))
+      throw 'Invalid trimesh options: ' + options;
+
+    if (!MESH_FILE_RE.test(options.url))
+      throw 'Unsupported mesh file format ' + options.url;
+
+    var objText = window.dali.resources
+      .ResourceManager.main.getResource(options.url)
+      .getText();
+
+    self.triangleData = function() {
+      // .obj parser
+      // TODO add other file formats
+      var data = {
+        aVertexPosition: { size: 3, data: [] },
+        aVertexNormal: { size: 3, data: [] },
+        aVertexTextureCoords: { size: 2, data: [] },
+        indices: { size: 3, data: [] }
+      };
+
+      var tracker = {
+        hashindices: {},
+        index: 0,
+      };
+
+      var vertices = [], normals = [], uvs = [];
+      // console.log(objText);
+
+      var lines = objText.split('\n');
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim(); // remove whitespace
+
+        var elements = line.split(WHITESPACE_RE);
+        elements.shift(); // remove front
+
+        if (VERTEX_RE.test(line)) {
+          Array.prototype.push.apply(vertices, elements);
+        } else if (TEXTURE_RE.test(line)) {
+          Array.prototype.push.apply(uvs, elements);
+        } else if (NORMAL_RE.test(line)) {
+          Array.prototype.push.apply(normals, elements);
+        } else if (FACE_RE.test(line)) {
+
+          var quad = false, nElements = elements.length;
+          for (var j = 0; j < nElements; j++) {
+
+            if (j === 3 && !quad) {
+              j = 2;
+              quad = true;
+            }
+
+            if (elements[j] in tracker.hashindices) {
+              data.indices.data.push(tracker.hashindices[elements[j]]);
+            } else {
+
+              var vertex = elements[j].split('/');
+
+              var v0 = (vertex[0] - 1) * 3;
+              data.aVertexPosition.data.push(+vertices[v0]);
+              data.aVertexPosition.data.push(+vertices[v0 + 1]);
+              data.aVertexPosition.data.push(+vertices[v0 + 2]);
+
+              if (uvs.length) {
+                var v1 = (vertex[1] - 1) * 2;
+                data.aVertexTextureCoords.data.push(+uvs[v1]);
+                data.aVertexTextureCoords.data.push(+uvs[v1 + 1]);
+              }
+
+              var v2 = (vertex[2] - 1) * 3;
+              data.aVertexNormal.data.push(+normals[v2]);
+              data.aVertexNormal.data.push(+normals[v2 + 1]);
+              data.aVertexNormal.data.push(+normals[v2 + 2]);
+
+              tracker.hashindices[elements[j]] = tracker.index;
+              data.indices.data.push(tracker.index);
+              tracker.index++;
+            }
+
+            if(j === 3 && quad) {
+                // add v0/t0/vn0 onto the second triangle
+                data.indices.data.push( tracker.hashindices[elements[0]]);
+            }
+          }
+        }
+      }
+      return data;
+    };
+
 
     // TODO
 
@@ -1247,6 +1365,8 @@ dali.graphx.g3D.fShaderCodeDefault = `
   }
 `;
 
+// src:
+//   http://prideout.net/blog/?p=22
 dali.graphx.g3D.fShaderCodeCartoon = `
   #extension GL_EXT_shader_texture_lod : enable
   #extension GL_OES_standard_derivatives : enable

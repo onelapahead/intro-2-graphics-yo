@@ -118,6 +118,7 @@ dali.ObjectManager = function(objType, base) {
     }
     if (self.hasObj(guid))
       return objects.get(guid);
+    console.log(objType);
     throw ('Does not contain an Object with guid: \'' + guid + '\'');
   };
 
@@ -189,17 +190,21 @@ dali.Entity = function (options, base) {
   };
   // framework function -- not required
   self.update = function(dt) {};
+  self.requestRender = function(){};
+  self.think = function() {};
 
   self._requestRender = function() {
     for (var component of renderables) {
       component.requestRender();
     }
+    self.requestRender();
   };
 
   self._think = function() {
     for (var component of thinkables) {
       component.think();
     }
+    self.think();
   };
 
   if (options == null || options.transform == null)

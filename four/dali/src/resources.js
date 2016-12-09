@@ -79,9 +79,9 @@
     base.createPromise = function(manager) {
       return new Promise(function(resolve, reject) {
         img = new Image();
-        img.crossOrigin = "anonymous";
+        img.crossOrigin = 'Anonymous';
         img.onload = function() {
-          isTranslucent = isImgTranslucent(img);
+          img.isTranslucent = isImgTranslucent(img);
           manager.addResource(base);
           resolve();
         };
@@ -113,7 +113,6 @@
               if (this.status == 200 && this.status < 300) {
                   text = req.response;
                   manager.addResource(base);
-                  console.log(text);
                   resolve();
               } else {
                   reject({
