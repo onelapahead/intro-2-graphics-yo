@@ -22,6 +22,10 @@
         gl.clearColor(0.0, 0.0, 0.0, 1.0); // use black when we clear the frame buffer
         gl.clearDepth(1.0); // use max when we clear the depth buffer
         gl.enable(gl.DEPTH_TEST); // use hidden surface removal (with zbuffering)
+      
+        gl.getExtension("OES_standard_derivatives");
+        gl.getExtension("EXT_shader_texture_lod");
+
       }
     } // end try
     catch(e) {
@@ -246,7 +250,7 @@
 
     function createAttribSetter(aLoc, aName) {
       return function (buffer) {
-        console.log(buffer);
+        // console.log(buffer);
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         // gl.enableVertexAttrib(aLoc);
         gl.enableVertexAttribArray(aLoc);
@@ -256,7 +260,7 @@
 
     self.setAttrib = function(aName, buffer) {
       // TODO error check
-      console.log(aName);
+      // console.log(aName);
       attribSetters[aName](buffer);
     };
 
@@ -387,7 +391,7 @@
       self.setUniform('uNumLights', light3ds.size());
       for (var i = 0; i < light3ds.size(); i++) {
         light = lights.next().value;
-        console.log('Setting some lights ' + light.transform.getPosition().vec3());
+        // console.log('Setting some lights ' + light.transform.getPosition().vec3());
         self.setUniform('uLightPositions[' + i + ']', light.transform.getPosition().vec3());
       }
 
@@ -465,7 +469,7 @@
       if (options == null || options.isOpaque == null || options.meshId == null || options.request == null)
         throw 'Invalid render request options: ' + options;
 
-      console.log(options.request);
+      // console.log(options.request);
 
       var map;
       if (options.isOpaque)
@@ -506,6 +510,8 @@
 
     if (mainCamera3d == null || options.main) mainCamera3d = self;
 
+    var oEye = vec3.clone(self.transform.getPosition().vec3());
+    oEye = vec4.fromValues(oEye[0], oEye[1], oEye[2], 1.0);
     var handedness;
     var projection;
     var lookUp, lookAt;
@@ -522,6 +528,10 @@
     function setProjection(options) {
       options = options || {};
       projection = {
+        left: options.left || -1,
+        right: options.right || 1,
+        bottom: options.bottom || -1,
+        top: options.top || 1,
         fovY: options.fovY || 0.25 * Math.PI,
         near: options.near || 0.1,
         far: options.far || 10,
@@ -564,9 +574,14 @@
       
       resizeAspect();
       // mat4.perspective(pMatrix, projection.fovY, projection.aspect, projection.near, projection.far);
-      mat4.ortho(pMatrix, -1, 1, -1, 1, projection.near, projection.far);
+      // mat4.ortho(pMatrix, -1, 1, -1, 1, projection.near, projection.far);
+      self.setProjection(pMatrix, projection);
 
       mat4.multiply(hpMatrix, hMatrix, pMatrix);
+    };
+
+    self.setProjection = function(pMatrix, projection) {
+      throw 'Not yet implemented ' + self.getType() + '.setProjection';
     };
 
     self.updateViewMatrix = function() {
@@ -576,7 +591,8 @@
       vec4.transformMat4(Up, Up, Transform);
       vec4.normalize(Up, Up);
 
-      var Eye = self.transform.getPosition().vec3();
+      var Eye = vec4.create();
+      vec4.transformMat4(Eye, oEye, Transform);
 
       var Center = vec4.fromValues(lookAt[0], lookAt[1], lookAt[2], 0.0);
       vec4.transformMat4(Center, Center, Transform);
@@ -584,9 +600,9 @@
       vec3.scale(Center, Center, eyeDistance);
       vec3.add(Center, Eye, Center);
 
-      console.log(Eye);
-      console.log(Center);
-      console.log(Up);
+      // console.log(Eye);
+      // console.log(Center);
+      // console.log(Up);
 
       mat4.lookAt(vMatrix, Eye, Center, Up);
       mat4.multiply(self.hpvMatrix, hpMatrix, vMatrix);
@@ -597,9 +613,7 @@
       
       setHandedness(options.handedness);
       setProjection(options);
-      self.updateHandProjMatrix();
       setView(options);
-      self.updateViewMatrix();
     }
     init(options);
 
@@ -611,6 +625,37 @@
     self.reset = function(options) {
       init(options);
     };
+
+    return self;
+  };
+
+  graphx.g3D.PerspectiveCamera = function(options, base) {
+    var self = graphx.g3D.Camera(options, base);
+    self.setType('perspective');
+
+    self.setProjection = function(pMatrix, projection) {
+      mat4.perspective(pMatrix, projection.fovY, projection.aspect, projection.near, projection.far);
+    };
+    self.updateHandProjMatrix();
+    self.updateViewMatrix();
+
+    return self;
+  };
+
+  graphx.g3D.OrthographicCamera = function(options, base) {
+    var self = graphx.g3D.Camera(options, base);
+    self.setType('orthographic');
+
+    self.setProjection = function(pMatrix, projection) {
+      mat4.ortho(
+        pMatrix,
+        projection.left, projection.right,
+        projection.bottom, projection.right,
+        projection.near, projection.far
+      );
+    };
+    self.updateHandProjMatrix();
+    self.updateViewMatrix();
 
     return self;
   };
@@ -648,8 +693,20 @@
       gl.bindTexture(gl.TEXTURE_2D, null);
     }
 
+    function createImageTexture(img) {
+      glTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, glTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.bindTexture(gl.TEXTURE_2D, null);      
+    }
+
     var glTexture;
     if (options.url != null) {
+      var img = window.dali.resources.ResourceManager.main.getResource(options.url);
+      createImageTexture(img.getImg());
       // TODO
     } else if (options.r != null && options.g != null && options.b != null && options.a != null) {
       createSolidTexture(options.r, options.g, options.b, options.a);
@@ -666,6 +723,7 @@
     return self;
   };
 
+  // TODO combine this with model.....
   // graphx.init() must be called before creating renderables
   graphx.g3D.Renderable3D = function(options, base) {
     var self = window.dali.Renderable(base);
@@ -766,27 +824,12 @@
     self.setType('mesh');
 
     var bufferInfo;
-    /**
-     *     var arrays = {
-     *       position: { numComponents: 3, data: [0, 0, 0, 10, 0, 0, 0, 10, 0, 10, 10, 0], },
-     *       aVertexTextureCoords: { numComponents: 2, data: [0, 0, 0, 1, 1, 0, 1, 1],     },
-     *       normal:   { numComponents: 3, data: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],     },
-     *       indices:  { numComponents: 3, data: [0, 1, 2, 1, 2, 3],                       },
-     *     };
-     * 
-     *  Creates an BufferInfo like this
-     *
-     *     bufferInfo = {
-     *       numElements: 4,        // or whatever the number of elements is
-     *       indices: WebGLBuffer,  // this property will not exist if there are no indices
-     *       attribs: {
-     *         a_position: { buffer: WebGLBuffer, numComponents: 3, },
-     *         a_normal:   { buffer: WebGLBuffer, numComponents: 3, },
-     *         a_texcoord: { buffer: WebGLBuffer, numComponents: 2, },
-     *       },
-     *     };
-     *
-     */
+
+    // if ((options == null || options.default == null ||
+    //      options.default != false) && shader3d != null) {
+    //   console.log('yeah');
+    //   shader3d.addMesh(self);
+    // }
 
     self.initBuffers = function() {
       var data = self.triangleData();
@@ -801,7 +844,7 @@
       bufferInfo.indices = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufferInfo.indices);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(data.indices.data), gl.STATIC_DRAW);
-      console.log(bufferInfo);
+      // console.log(bufferInfo);
       return bufferInfo;
     };
 
@@ -830,59 +873,94 @@
 
     self.getBufferInfo = function () { return bufferInfo; };
 
+    // n - number of vertices
+    var AABB, AABS, oAABB;
+
+    // O(n)
+    self.initAABB = function() {
+      // TODO vertex scan of min/max x, y, z values
+    };
+
+    // O(1)
+    self.updateAABB = function() {
+
+      // TODO Use transform to rotate oAABB
+      // determine AABB from 8-vertices of
+      // rotated oAABB
+
+    };
+
+    // O(1)
+    function rotatedToAABB(box){
+      // TODO
+    }
+
+    // O(n)
+    self.initAABS = function() {
+      // TODO vertex scan of largest distance
+    };
+
     return self;
   };
 
   // PLANEMESH
-
   graphx.g3D.PlaneMesh = function(options, base) {
     var self = graphx.g3D.Mesh(base);
-    self.setType('planemesh');
-    
-    // TODO make generatable
+    self.setType('planemesh');    
+
+    var width = options.width || 1; // in boxes
+    var height = options.height || 1; // in boxes
+    self.dGUID = self.getType() + '.' + width + '.' + height;
 
     self.triangleData = function() {
-      return {
+      var data = {
         aVertexPosition: {
           size: 3,
-          data: [
-            -0.5, 0, -0.5, // LL
-            -0.5, 0, 0.5, // UL
-            0.5, 0, -0.5, // LR
-            0.5, 0, 0.5 // UR
-          ],
+          data: []
         },
         aVertexNormal: {
           size: 3,
-          data: [
-            0, 1, 0, // LL
-            0, 1, 0, // UL
-            0, 1, 0, // LR
-            0, 1, 0 // UR
-          ],
+          data: []
         },
         aVertexTextureCoords: {
-          size: 2,
-          data: [
-            0, 0, // LL
-            0, 1, // UL
-            1, 0, // LR
-            1, 1 // UR
-          ],
+          size: 3,
+          data: []
         },
         indices: {
           size: 3,
-          data: [
-            0, 1, 2, // triangle1
-            3, 2, 1 // triangle2
-          ],
-        },
+          data: [],
+        }
       };
+
+      var triIndex = 0;
+      var dw = 1.0 / width;
+      var dh = 1.0 / height;
+
+      for (var i = -0.5; i < 0.5; i += dw) {
+        for (var j = -0.5; j < 0.5; j+= dh) {
+          data.aVertexPosition.data.push(i, 0, j);
+          data.aVertexPosition.data.push(i + dw, 0, j);
+          data.aVertexPosition.data.push(i + dw, 0, j + dh);
+          data.aVertexPosition.data.push(i, 0, j + dh);
+        
+          for (var v = 0; v < 4; v++) {
+            data.aVertexNormal.data.push(0, 1, 0);
+          }
+
+          data.aVertexTextureCoords.data.push(0,0);
+          data.aVertexTextureCoords.data.push(1,0);
+          data.aVertexTextureCoords.data.push(1,1);
+          data.aVertexTextureCoords.data.push(0,1);
+
+          data.indices.data.push(triIndex, triIndex+1, triIndex+2);
+          data.indices.data.push(triIndex, triIndex+2, triIndex+3);
+          triIndex += 4;
+        }
+      }
+      return data;
     };
     return self;
   };
-
-  // CUBEMESH
 
   // SPHEREMESH
   graphx.g3D.SphereMesh = function(options, base) {
@@ -940,7 +1018,107 @@
   };
 
   graphx.g3D.BoxMesh = function(options, base) {
-    // TODO
+    var self = graphx.g3D.Mesh(base);
+    self.setType('boxmesh');
+    options = options || {};
+    var width = options.width || 1,
+        height = options.height || 1,
+        depth = options.depth || 1;
+
+    self.triangleData = function() {
+      var data = {
+        aVertexPosition: { size: 3, data: [] },
+        aVertexNormal: { size: 3, data: [] },
+        aVertexTextureCoords: { size: 2, data: [] },
+        indices: { size: 3, data: [] }
+      };
+
+      var triIndex = 0;
+      var dw = 1.0 / width, dh = 1.0 / height, dl = 1.0 / depth;
+
+      // top and bottom
+      for (var l = -0.5; l <= 0.5; l++) {
+        for (var i = -0.5; i < 0.5; i += dw) {
+          for (var j = -0.5; j < 0.5; j+= dh) {
+            data.aVertexPosition.data.push(i, l, j);
+            data.aVertexPosition.data.push(i + dw, l, j);
+            data.aVertexPosition.data.push(i + dw, l, j + dh);
+            data.aVertexPosition.data.push(i, l, j + dh);
+          
+            var sign = l < 0 ? -1 : 1;
+
+            for (var v = 0; v < 4; v++) {
+              data.aVertexNormal.data.push(0, sign, 0);
+            }
+
+            data.aVertexTextureCoords.data.push(0,0);
+            data.aVertexTextureCoords.data.push(1,0);
+            data.aVertexTextureCoords.data.push(1,1);
+            data.aVertexTextureCoords.data.push(0,1);
+
+            data.indices.data.push(triIndex, triIndex+1, triIndex+2);
+            data.indices.data.push(triIndex, triIndex+2, triIndex+3);
+            triIndex += 4;
+          }
+        }
+      }
+
+      for (var i = -0.5; i <= 0.5; i++) {
+        for (var l = -0.5; l < 0.5; l += dl) {
+          for (var j = -0.5; j < 0.5; j+= dh) {
+            data.aVertexPosition.data.push(i, l, j);
+            data.aVertexPosition.data.push(i, l + dl, j);
+            data.aVertexPosition.data.push(i, l + dl, j + dh);
+            data.aVertexPosition.data.push(i, l, j + dh);
+          
+            var sign = i < 0 ? -1 : 1;
+
+            for (var v = 0; v < 4; v++) {
+              data.aVertexNormal.data.push(sign, 0, 0);
+            }
+
+            data.aVertexTextureCoords.data.push(0,0);
+            data.aVertexTextureCoords.data.push(1,0);
+            data.aVertexTextureCoords.data.push(1,1);
+            data.aVertexTextureCoords.data.push(0,1);
+
+            data.indices.data.push(triIndex, triIndex+1, triIndex+2);
+            data.indices.data.push(triIndex, triIndex+2, triIndex+3);
+            triIndex += 4;
+          }
+        }
+      }
+
+      for (var j = -0.5; j <= 0.5; j++) {
+        for (var l = -0.5; l < 0.5; l += dl) {
+          for (var i = -0.5; i < 0.5; i += dw) {
+            data.aVertexPosition.data.push(i, l, j);
+            data.aVertexPosition.data.push(i, l + dl, j);
+            data.aVertexPosition.data.push(i + dw, l + dl, j);
+            data.aVertexPosition.data.push(i + dw, l, j);
+          
+            var sign = j < 0 ? -1 : 1;
+
+            for (var v = 0; v < 4; v++) {
+              data.aVertexNormal.data.push(0, 0, sign);
+            }
+
+            data.aVertexTextureCoords.data.push(0,0);
+            data.aVertexTextureCoords.data.push(1,0);
+            data.aVertexTextureCoords.data.push(1,1);
+            data.aVertexTextureCoords.data.push(0,1);
+
+            data.indices.data.push(triIndex, triIndex+1, triIndex+2);
+            data.indices.data.push(triIndex, triIndex+2, triIndex+3);
+            triIndex += 4;
+          }
+        }
+      }
+
+      return data;
+    };
+
+    return self;
   };
 
   // TRIMESH
@@ -1060,6 +1238,87 @@ dali.graphx.g3D.fShaderCodeDefault = `
       Idiff = clamp(Idiff, 0.0, 1.0);
 
       vec3 Ispec = uProductsSpecular[i] * pow(max(dot(n, H), 0.0), uShininess);
+      Ispec = clamp(Ispec, 0.0, 1.0);
+
+      color = clamp(color + uProductsAmbient[i] + Idiff + Ispec, 0.0, 1.0);
+    }
+
+    gl_FragColor = vec4(color, uAlpha) * texture2D(uTexture, vec2(vTextureCoords.s, vTextureCoords.t));
+  }
+`;
+
+dali.graphx.g3D.fShaderCodeCartoon = `
+  #extension GL_EXT_shader_texture_lod : enable
+  #extension GL_OES_standard_derivatives : enable
+
+  precision mediump float; // set float to medium precision
+
+  // eye location
+  uniform vec3 uEyePosition; // the eye's position in world
+
+  // lights informations
+  uniform int uNumLights; // actual number of lights
+  #define MAX_LIGHTS ` + dali.graphx.g3D.MAX_LIGHTS + ` // allowed max
+  uniform vec3 uLightPositions[MAX_LIGHTS]; // array of light positions
+  uniform vec3 uProductsAmbient[MAX_LIGHTS];
+  uniform vec3 uProductsDiffuse[MAX_LIGHTS];
+  uniform vec3 uProductsSpecular[MAX_LIGHTS];
+  uniform float uShininess;
+
+  // geometry properties
+  varying vec3 vWorldPos; // world xyz of fragment
+  varying vec3 vVertexNormal; // normal of fragment
+
+  varying highp vec2 vTextureCoords; // interpolated uv
+  uniform sampler2D uTexture; // texture sampler
+  uniform float uAlpha; // material alpha
+
+float stepmix(float edge0, float edge1, float E, float x) {
+    float T = clamp(0.5 * (x - edge0 + E) / E, 0.0, 1.0);
+    return mix(edge0, edge1, T);
+}
+
+
+  void main(void) {
+    vec3 color = vec3(0.0, 0.0, 0.0);
+    const float A = 0.1;
+    const float B = 0.3;
+    const float C = 0.6;
+    const float D = 1.0;
+
+    vec3 Eye = normalize(uEyePosition - vWorldPos);
+    vec3 n = normalize(vVertexNormal);
+    for (int i = 0; i < MAX_LIGHTS; i++) {
+      if (i >= uNumLights) break;
+      vec3 L = normalize(uLightPositions[i] - vWorldPos);
+      vec3 H = normalize(L + Eye);
+
+      float df = max(dot(n, L), 0.0);
+      float sf = pow(max(dot(n, H), 0.0), uShininess);
+      float E = fwidth(df);
+
+      if (df > A - E && df < A + E) df = stepmix(A, B, E, df);
+      else if (df > B - E && df < B + E) df = stepmix(B, C, E, df);
+      else if (df > C - E && df < C + E) df = stepmix(C, D, E, df);
+      else if (df < A) df = 0.0;
+      else if (df < B) df = B;
+      else if (df < C) df = C;
+      else df = D;
+
+      E = fwidth(sf);
+      if (sf > 0.5 - E && sf < 0.5 + E)
+      {
+        sf = smoothstep(0.5 - E, 0.5 + E, sf);
+      }
+      else
+      {
+          sf = step(0.5, sf);
+      }
+
+      vec3 Idiff = uProductsDiffuse[i] * df;
+      Idiff = clamp(Idiff, 0.0, 1.0);
+
+      vec3 Ispec = uProductsSpecular[i] * sf;
       Ispec = clamp(Ispec, 0.0, 1.0);
 
       color = clamp(color + uProductsAmbient[i] + Idiff + Ispec, 0.0, 1.0);

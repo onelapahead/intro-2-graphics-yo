@@ -89,7 +89,7 @@ dali.ObjectManager = function(objType, base) {
 
   function checkGuid(guid) {
     if (!dali.isString(guid)) throw 'Invalid guid ' + guid;
-    if (objects.has(guid)) throw 'GUID collision: ' + guid;
+    if (objects.has(guid)) throw 'ObjectManager ' + objType +'GUID collision: ' + guid;
   }
 
   // public
@@ -220,7 +220,7 @@ dali.EntityTransform = function (options, base, parent) {
   self.setType('entitytransform');
 
   // parent EntityTransform for object hierarchies
-  self.parent = parent || null;
+  self.parent = parent;
 
   var position = null, rotation = null, scale = null;
 
@@ -255,7 +255,7 @@ dali.EntityTransform = function (options, base, parent) {
     axes.x = axes.x || 0.0; // degrees
     axes.y = axes.y || 0.0; // degrees
     axes.z = axes.z || 0.0; // degrees
-    console.log(axes);
+    // console.log(axes);
     var up = vec4.fromValues(0, 1, 0, 0);
     var at = vec4.fromValues(0, 0, 1, 0);
 
@@ -265,6 +265,7 @@ dali.EntityTransform = function (options, base, parent) {
 
     var rot = mat4.create();
     mat4.identity(rot);
+    // TODO Retry quat set axes, rotation still buggy...
     // quat.setAxes(rot, at, right, up);
 
     mat4.rotate(rot, rot, axes.x * Math.PI / 180.0, right);
@@ -309,8 +310,10 @@ dali.EntityTransform = function (options, base, parent) {
       scale.vec3(),
       vec3.fromValues(0, 0, 0) // TODO change to position?
     );
-    if (self.parent != null)
-      mat4.multiply(t, self.parent.toMatrix(), t);
+    if (self.parent != null) {
+      console.log(self.dGUID + ' parent')
+      mat4.multiply(t, t, self.parent.toMatrix());
+    }
     return t;
   }
 
