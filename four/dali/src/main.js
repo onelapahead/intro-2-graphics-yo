@@ -28,12 +28,12 @@ function main() {
     transform: {
       options: {
         position: {
-          x: 0.5, y: 0.5, z: -0.5,
+          x: 0.5, y: 1.5, z: 0.5,
         },
       }
     },
-    lookAt: [0, 0, 1],
-    lookUp: [0, 1, 0],
+    lookAt: [0, -1, 0],
+    lookUp: [0, 0, 1],
     eyeDistance: 0.5,
     fovY: 0.5 * Math.PI,
   });
@@ -58,7 +58,6 @@ function main() {
     diffuse: [1, 1, 1],
     specular: [1, 1, 1],
   });
-  console.log(light);
   scene.addEntity(light);
   
   var sphereMesh = dali.graphx.g3D.SphereMesh();
@@ -120,13 +119,13 @@ function main() {
     transform: {
       options: {
         position: {
-          x: 0.5, y: 0.5, z: 1.0,
+          x: 0.5, y: 0, z: 0.1,
         },
         scale: {
-          x: 1.0, y: 1.0, z: 2.0
+          x: 5.0, y: 1.0, z: 0.5
         },
         axes: {
-          x: -90.0,
+          x: 0.0,
           y: 0.0,
           z: 0.0,
         }

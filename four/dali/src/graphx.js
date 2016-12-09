@@ -403,7 +403,6 @@
 
       for (var meshId of map.keys()) {
         mesh = meshMap.get(meshId);
-        console.log(mesh.getType());
         bufferInfo = mesh.getBufferInfo();
         for (var key in bufferInfo.attribs) {
           if (bufferInfo.attribs.hasOwnProperty(key)) {
@@ -414,7 +413,6 @@
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufferInfo.indices);
 
         queue = map.get(meshId);
-                console.log(queue);
         for (var request of queue) {
           // TODO
           material = request.material;
@@ -433,15 +431,9 @@
           for (var i = 0; i < light3ds.size(); i++) {
             light = lights.next().value;
 
-            console.log(light.color);
-            console.log(material);
             vec3.multiply(ambient, light.color.ambient, material.ambient);
             vec3.multiply(diffuse, light.color.diffuse, material.diffuse);
             vec3.multiply(specular, light.color.specular, material.specular);
-
-            console.log(ambient);
-            console.log(diffuse);
-            console.log(specular);
 
             self.setUniform('uProductsAmbient[' + i + ']', ambient);
             self.setUniform('uProductsDiffuse[' + i + ']', diffuse);
@@ -571,8 +563,9 @@
       mat4.fromScaling(hMatrix, handedness);
       
       resizeAspect();
-      mat4.perspective(pMatrix, projection.fovY, projection.aspect, projection.near, projection.far);
-      
+      // mat4.perspective(pMatrix, projection.fovY, projection.aspect, projection.near, projection.far);
+      mat4.ortho(pMatrix, -1, 1, -1, 1, projection.near, projection.far);
+
       mat4.multiply(hpMatrix, hMatrix, pMatrix);
     };
 
