@@ -200,6 +200,7 @@ function Player(options) {
     keyMap.set(keys[ki], false);
   }
 
+  var keyCode;
   function handlePressDown(code) {
     if (code == 'KeyW' && j < groundMax.j - 1) {
       j += 1;
@@ -216,7 +217,8 @@ function Player(options) {
   self.addEventListener('keydown', function(event) {
     if (keyMap.has(event.code) && !keyMap.get(event.code)) {
       keyMap.set(event.code, true);
-      handlePressDown(event.code);
+      if (!dali.pause)
+        keyCode = event.code;
     }
   });
 
@@ -225,6 +227,13 @@ function Player(options) {
       keyMap.set(event.code, false);
     }
   });
+
+  self.update = function(dt) {
+    if (keyCode != null) {
+      handlePressDown(keyCode);
+    }
+    keyCode = null;
+  };
 
   return self;
 }
@@ -339,7 +348,7 @@ function Car(meshId, _speed, options) {
 function main() {
 
   var prev, current, dt;
-  var pause = false;
+  dali.pause = false;
   function init() {
     prev = performance.now();
     requestAnimationFrame(loop);
@@ -349,7 +358,7 @@ function main() {
     requestAnimationFrame(loop);
     // TODO apart of Time/Timeline
     
-    if (!pause) {
+    if (!dali.pause) {
       current = performance.now();
       dt = current - prev;
       prev = current;
@@ -364,11 +373,11 @@ function main() {
 
   dali.SceneManager.addEventListener('keydown', function(keyEvent) {
     if (keyEvent.code === 'Escape') {
-      if (!pause) {
-        pause = true;
+      if (!dali.pause) {
+        dali.pause = true;
       } else {
         prev = performance.now();
-        pause = false;
+        dali.pause = false;
       }
     }   
   });
@@ -565,6 +574,7 @@ function main() {
           }
         }
       });
+      scene.addEntity(player);
 
       var frog = Frog('img/HandleTex.png', frogMesh.dGUID, {
         transform: {
