@@ -1,4 +1,8 @@
 
+// Octree probably does better and ensures
+// O(1) collision check within bin making
+// it guarrenteed O(n) (the building of the tree)?
+
 // Collision detection algorithm:
 //    Time -- O(n)
 //    Space -- O(l^3 + n) // l - num cubes per side

@@ -416,7 +416,6 @@
 
         queue = map.get(meshId);
         for (var request of queue) {
-          // TODO
           material = request.material;
           texture = request.texture;
           mMatrix = request.transform;
@@ -720,7 +719,7 @@
     } else throw 'Invalid texture2 options: ' + options;
 
     self.isTranslucent = function() {
-      return isTranslucent; // TODO check for transparency in image using hidden canvas
+      return isTranslucent;
     };
 
     self.getTexture = function() {

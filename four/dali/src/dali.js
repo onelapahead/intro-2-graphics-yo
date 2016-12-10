@@ -354,13 +354,28 @@ dali.EntityTransform = function (options, base, parent) {
       rotation.quat(),
       position.vec3(),
       scale.vec3(),
-      position.vec3() // TODO change to position?
+      // position.vec3() // TODO change to position?
+      vec3.fromValues(0, 0, 0)
     );
     if (self.parent != null) {
       mat4.multiply(t, self.parent.toMatrix(), t);
     }
     return t;
-  }
+  };
+
+  self.translate = function(translation) {
+    // TODO error check
+    position.x += translation.x;
+    position.y += translation.y;
+    position.z += translation.z;
+  };
+
+  self.translateRoot = function(translation) {
+    if (self.parent != null) {
+      self.translate(translation);
+    }
+    self.parent.translateRoot();
+  };
 
   return self;
 };

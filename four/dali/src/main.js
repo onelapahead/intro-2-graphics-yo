@@ -7,6 +7,15 @@ var defaultMaterial = dali.graphx.Material({
   shininess: 32.0,
 });
 
+var frogMaterial = dali.graphx.Material({
+  ambient: [0.1, 0.3, 0.1],
+  diffuse: [0.2, 1.0, 0.2],
+  specular: [0.6, 0.8, 0.6],
+  alpha: 1.0,
+  shininess: 64.0,
+});
+
+var ground;
 function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
   var self = dali.Entity({ 
     transform: {
@@ -23,30 +32,43 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
       numZ = Math.floor(dimensions.z / step);
 
   self.quantize = function(x, z) {
-    console.log(ll);
-    console.log(x); 
-    console.log(z);
-    var i = Math.floor((x - ll.x) / step),
-        j = Math.floor((z - ll.z) / step);
+    // console.log('x: ' + x + ', z: ' + z);
+    var dx = (x - ll.x);
+    var dz = (z - ll.z);
+    // console.log('dx: ' + dx + ', dz: ' + dz);
+    var i = Math.floor(dx / step),
+        j = Math.floor(dz / step);
     return [i, j];
   };
 
   self.localize = function(i, j) {
     var x = ll.x + step * i + step/2,
         z = ll.z + step * j + step/2;
-    return [x, 0, z];
+    // console.log('x: ' + x + ', z: ' + z);
+    return [x, 0, z]; 
   };
 
-  console.log(step);
-  console.log(numX);
-  console.log(numZ);
   var sections = _sections;
-
   var tiles = [];
-
   var ll = {
     x: center[0] - 0.5 * dimensions.x,
     z: center[2] - 0.5 * dimensions.z,
+  };
+  var ur = {
+    x: center[0] + 0.5 * dimensions.x,
+    z: center[2] + 0.5 * dimensions.z
+  };
+
+  self.getWorldBounds = function() {
+    return {
+      'min': ll, 'max': ur
+    };
+  };
+
+  self.getGridBounds = function() {
+    return {
+      min: { i: 0, j: 0 }, max: { i: numX, j: numZ } 
+    };
   };
 
   /**
@@ -56,11 +78,11 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
    */
   var section = sections[0];
   var secPtr = 0, texture;
-  for (var i = 0; i < numX; i++) {
+  for (var i = 0; i <= numX; i++) {
     tiles.push([]);
     secPtr = 0;
     section = sections[secPtr++];
-    for (var j = 0; j < numZ; j++) {
+    for (var j = 0; j <= numZ; j++) {
       if (j === section.zBound && secPtr < sections.length) {
         section = sections[secPtr++];
       }
@@ -69,7 +91,7 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
       else
         texture = section.texture;
 
-      tiles[i].push(Ground(texture, boxMeshId, {
+      tiles[i].push(GroundTile(texture, boxMeshId, {
         transform: { 
           options: {
             position: {
@@ -78,9 +100,9 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
               z: ll.z + j * step + step/2,
             },
             scale: {
-              x: step * 1.44,
+              x: step,
               y: 0.1,
-              z: step * 1.44,
+              z: step,
             }
           }
         },
@@ -107,7 +129,7 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
   return self;
 }
 
-function Ground(textureUrl, meshId, options) {
+function GroundTile(textureUrl, meshId, options) {
   var self = dali.Entity(options);
 
   var texture = dali.graphx.g3D.Texture({
@@ -134,7 +156,75 @@ function Ground(textureUrl, meshId, options) {
 function Player(options) {
   var self = dali.Entity(options);
 
+  var position = self.transform.getPosition();
+  var pair = ground.quantize(position.x, position.z);
+  var i = pair[0], j = pair[1];
+  pair = ground.localize(i, j);
+  position.x = pair[0];
+  position.z = pair[2];
+  position = null;
+  delete position;
+  delete pair;
 
+ var groundMax = ground.getGridBounds().max;
+  var keyMap = new Map();
+
+  var keys = [
+    'KeyW',
+    'KeyA',
+    'KeyS',
+    'KeyD'
+  ];
+
+  function updateIJ() {
+    var position = self.transform.getPosition();
+    var pair = ground.quantize(position.x, position.z);
+    i = pair[0], j = pair[1];
+    position = null;
+    delete position;
+    delete pair;
+  }
+
+  function updatePosition() {
+    console.log('i: ' + i + ', j: ' + j);
+    var coords = ground.localize(i, j);
+    var position = self.transform.getPosition();
+    position.x = coords[0];
+    position.z = coords[2];
+    position = null;
+    delete position;
+    delete coords;
+  }
+
+  for (var ki = 0; ki < keys.length; ki++) {
+    keyMap.set(keys[ki], false);
+  }
+
+  function handlePressDown(code) {
+    if (code == 'KeyW' && j < groundMax.j - 1) {
+      j += 1;
+    } else if (code == 'KeyA' && i > 0) {
+      i -= 1;
+    } else if (code == 'KeyS' && j > 0) {
+      j -= 1;
+    } else if (code == 'KeyD' && i < groundMax.i - 1) {
+      i += 1;
+    } else return ;
+    updatePosition();
+  }
+
+  self.addEventListener('keydown', function(event) {
+    if (keyMap.has(event.code) && !keyMap.get(event.code)) {
+      keyMap.set(event.code, true);
+      handlePressDown(event.code);
+    }
+  });
+
+  self.addEventListener('keyup', function(event) {
+    if (keyMap.has(event.code) && keyMap.get(event.code)) {
+      keyMap.set(event.code, false);
+    }
+  });
 
   return self;
 }
@@ -148,7 +238,8 @@ function Frog(textureUrl, meshId, options) {
   //   alpha: 1.0,
   //   shininess: 9.0,
   // });
-  var mat = defaultMaterial;
+
+  var mat = frogMaterial;
   var texture = dali.graphx.g3D.Texture({
     url: textureUrl
   });
@@ -165,17 +256,6 @@ function Frog(textureUrl, meshId, options) {
 
   self.addRenderable(renderer);
 
-  var updater = (function() {
-    var _self = dali.Updatable();
-
-    _self.update = function(dt) {
-      var pos = self.transform.getPosition();
-      pos.z += 0.25 * dt;
-    };
-
-    return _self;
-  }) ();
-  self.addUpdatable(updater);
   return self;
 }
 
@@ -331,7 +411,7 @@ function main() {
     transform: {
       options: {
         position: {
-          x: -1.5, y: 2.1, z: 0.0
+          x: -2, y: 2.1, z: 0.0
         },
       },
       parent: null,
@@ -347,7 +427,7 @@ function main() {
     transform: {
       options: {
         position: {
-          x: 1.5, y: 2.1, z: 0.0
+          x: 2, y: 2.1, z: 0.0
         },
       },
       parent: null,
@@ -400,16 +480,16 @@ function main() {
 
       // GameObjects
 
-      var ground = GroundGrid(
-        { x: 4, y: 0, z: 4},
+      ground = GroundGrid(
+        { x: 4.4, y: 4.4, z: 4.4},
         0.4,
         [0.0, 0.0, 0.0],
         [
           { zBound: 1, texture: 'img/grass-textures.jpg'},
-          { zBound: 4, texture: 'img/asphalt_texture407.jpg'},
-          { zBound: 5, texture: 'img/grass-textures.jpg' },
-          { zBound: 9, texture: 'img/water.jpg' },
-          { zBound: 10, texture: 'img/fire.jpg', texture1: 'img/grass-textures.jpg' },
+          { zBound: 5, texture: 'img/asphalt_texture407.jpg'},
+          { zBound: 6, texture: 'img/grass-textures.jpg' },
+          { zBound: 10, texture: 'img/water.jpg' },
+          { zBound: 11, texture: 'img/fire.jpg', texture1: 'img/grass-textures.jpg' },
         ],
         boxMesh.dGUID
       );
@@ -461,19 +541,8 @@ function main() {
       // Player and Camera objects
 
       // Setup follow camera to look at frog
-      var frogPosition = {
-        x: 0.0, y: 0.0, z: -1.5,
-      };
-      console.log(frogPosition);
-      var pair = ground.quantize(frogPosition.x, frogPosition.z);
-      console.log(pair);
-      pair = ground.localize(pair[0], pair[1]);
-      frogPosition.x = pair[0];
-      frogPosition.z = pair[2];
-      console.log(pair);
-      delete pair;
       var cameraPosition = {
-        x: 0.0, y: 1.0, z: -2.0,
+        x: 0.0, y: 1.0, z: -1.4,
       };
       var at = vec3.fromValues(-cameraPosition.x,
                                -cameraPosition.y,
@@ -484,20 +553,33 @@ function main() {
       vec3.cross(up, at, right);
       vec3.normalize(up, up);
 
-      var frog = Frog('img/HandleTex.png', frogMesh.dGUID, {
+      var player = Player({
         transform: {
           options: {
-            position: frogPosition,
+            position: {
+              x: 0.0, y: 0.0, z: -1.5,
+            },
             scale: {
-              x: 0.2, y: 0.2, z: 0.2
+              x: 1.0, y: 1.0, z: 1.0
             },
           }
         }
       });
-      scene.addEntity(frog);
 
-      frogPosition = frog.transform.getPosition();
-      console.log(ground.quantize(frogPosition.x, frogPosition.z));
+      var frog = Frog('img/HandleTex.png', frogMesh.dGUID, {
+        transform: {
+          options: {
+            position: {
+              x: 0.0, y: 0.0, z: 0,
+            },
+            scale: {
+              x: 0.2, y: 0.2, z: 0.2
+            },
+          },
+          parent: player.transform
+        }
+      });
+      scene.addEntity(frog);
 
       var cameraFollow = dali.graphx.g3D.PerspectiveCamera({
         transform: {
@@ -516,7 +598,7 @@ function main() {
         transform: {
           options: {
             position: {
-              x: 0.0, y: 1.5, z: 0.0,
+              x: 0.0, y: 1.1, z: 0.0,
             },
           },
         },
@@ -532,11 +614,28 @@ function main() {
       scene.addEntity(cameraFollow);
       shader.setCamera(mainCamera);
 
+      function swapCamera() {
+        mainCamera = mainCamera === cameraFollow ? cameraTop : cameraFollow;
+        shader.setCamera(mainCamera);
+      }
+
+      var pressed = false;
       // camera swapping on Space
       scene.addEventListener('keydown', function(event) {
         if (event.code === 'Space') {
-          mainCamera = mainCamera === cameraFollow ? cameraTop : cameraFollow;
-          shader.setCamera(mainCamera);
+          if (!pressed) {
+            pressed = true;
+            swapCamera();
+          }
+        }
+      });
+
+      shader.addEventListener('keyup', function(keyEvent) {
+        if (event.code === 'Space') {
+          if (pressed) {
+            pressed = false;
+            swapCamera();
+          }
         }
       });
 
