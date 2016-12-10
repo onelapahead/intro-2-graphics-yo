@@ -23,6 +23,7 @@ gulp.task('build', function () {
       './src/events.js',
       './src/scenes.js',
       './src/graphx.js',
+      './src/shaders.js',
       './src/physx.js',
       './src/ai.js',
       './src/audio.js',

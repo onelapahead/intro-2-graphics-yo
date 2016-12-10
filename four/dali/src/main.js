@@ -2,7 +2,7 @@
 var defaultMaterial = dali.graphx.Material({
   ambient: [0.1, 0.1, 0.1],
   diffuse: [1.0, 1.0, 1.0],
-  specular: [1.0, 1.0, 1.0],
+  specular: [0.8, 0.8, 0.8],
   alpha: 1.0,
   shininess: 32.0,
 });
@@ -21,6 +21,19 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
 
   var numX = dimensions.x / step,
       numZ = dimensions.z / step;
+
+  self.quantize = function(position) {
+
+  };
+
+  self.localize = function(pair) {
+    var i = pair[0], j = pair[1];
+
+  };
+
+  console.log(step);
+  console.log(numX);
+  console.log(numZ);
   var sections = _sections;
 
   var tiles = [];
@@ -30,14 +43,18 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
     z: center[2] - 0.5 * dimensions.z,
   };
 
-  // { zBound, texture, action? }
+  /**
+   * Grid consists of "sections", a group of consecutive
+   * rows of the same texture and collision action.
+   * Sections are defined using their lower z-bound, 
+   */
   var section = sections[0];
   var secPtr = 0, texture;
-  for (var i = 0; i <= numX; i++) {
+  for (var i = 0; i < numX; i++) {
     tiles.push([]);
     secPtr = 0;
     section = sections[secPtr++];
-    for (var j = 0; j <= numZ; j++) {
+    for (var j = 0; j < numZ; j++) {
       if (j === section.zBound && secPtr < sections.length) {
         section = sections[secPtr++];
       }
@@ -50,14 +67,14 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
         transform: { 
           options: {
             position: {
-              x: ll.x + i * step + step / 2,
-              y: -0.1,
-              z: ll.z + j * step + step / 2,
+              x: ll.x + i * step + step/2,
+              y: -0.05,
+              z: ll.z + j * step + step/2,
             },
             scale: {
-              x: step,
+              x: step * 1.44,
               y: 0.1,
-              z: step,
+              z: step * 1.44,
             }
           }
         },
@@ -236,39 +253,39 @@ function Car(meshId, _speed, options) {
 function main() {
 
   var prev, current, dt;
-  var stop = false;
+  var pause = false;
   function init() {
     prev = performance.now();
     requestAnimationFrame(loop);
   }
 
   function loop() {
-    if (!stop)
-      requestAnimationFrame(loop);
-    
+    requestAnimationFrame(loop);
     // TODO apart of Time/Timeline
-    current = performance.now();
-    dt = current - prev;
-    prev = current;
-
-    scene.update(dt / 1000);
+    
+    if (!pause) {
+      current = performance.now();
+      dt = current - prev;
+      prev = current;
+      scene.update(dt / 1000);
+    }
+    
     scene.requestRender();
     dali.graphx.render();
   }
 
   // ESC to pause
-  document.onkeydown = function(keyEvent) {
-    console.log('yeah');
+
+  dali.SceneManager.addEventListener('keydown', function(keyEvent) {
     if (keyEvent.code === 'Escape') {
-      if (!stop) {
-        stop = true;
+      if (!pause) {
+        pause = true;
       } else {
         prev = performance.now();
-        stop = false;
-        requestAnimationFrame(loop);
+        pause = false;
       }
     }   
-  };
+  });
 
   var resources = {
     img: [
@@ -295,29 +312,12 @@ function main() {
   // loads WebGL
   dali.graphx.load();
 
-  var camera = dali.graphx.g3D.PerspectiveCamera({
-    transform: {
-      options: {
-        position: {
-          x: 0.5, y: 1.0, z: 0.0,
-        },
-      },
-      // parent: o.transform,
-    },
-    lookAt: [0, -1, 0],
-    lookUp: [0, 0, 1],
-    eyeDistance: 0.5,
-    fovY: 0.5 * Math.PI,
-  });
-
-  // scene.addEntity(camera);
-
   var shader = dali.graphx.g3D.ShaderProgram3D({
     default: true,
-    // fShader: dali.graphx.Shader({
-    //   code: dali.graphx.g3D.fShaderCodeCartoon,
-    //   type: dali.graphx.gl.FRAGMENT_SHADER
-    // }),
+    fShader: dali.graphx.Shader({
+      code: dali.graphx.g3D.fShaderCodeCartoon,
+      type: dali.graphx.gl.FRAGMENT_SHADER
+    }),
   });
   dali.graphx.addProgram(shader);
 
@@ -325,61 +325,29 @@ function main() {
     transform: {
       options: {
         position: {
-          x: 0.0, y: 1.0, z: 0.0
+          x: -1.5, y: 2.1, z: 0.0
         },
       },
       parent: null,
       base: null,
     },
-    ambient: [1.0, 1.0, 1.0],
+    ambient: [0.2, 0.2, 0.2],
     diffuse: [0.6, 0.6, 0.6],
     specular: [0.3, 0.3, 0.3],
   });
   scene.addEntity(light);
 
-  // light = dali.graphx.g3D.Light({
-  //   transform: {
-  //     options: {
-  //       position: {
-  //         x: 0.0, y: 1.0, z: 1.0
-  //       },
-  //     },
-  //     parent: null,
-  //     base: null,
-  //   },
-  //   ambient: [1.0, 1.0, 1.0],
-  //   diffuse: [0.6, 0.6, 0.6],
-  //   specular: [0.3, 0.3, 0.3],
-  // });
-  // scene.addEntity(light);
-
-  // light = dali.graphx.g3D.Light({
-  //   transform: {
-  //     options: {
-  //       position: {
-  //         x: 1.0, y: 1.0, z: 1.0
-  //       },
-  //     },
-  //     parent: null,
-  //     base: null,
-  //   },
-  //   ambient: [1.0, 1.0, 1.0],
-  //   diffuse: [0.6, 0.6, 0.6],
-  //   specular: [0.3, 0.3, 0.3],
-  // });
-  // scene.addEntity(light);
-
   light = dali.graphx.g3D.Light({
     transform: {
       options: {
         position: {
-          x: 1.0, y: 1.0, z: 0.0
+          x: 1.5, y: 2.1, z: 0.0
         },
       },
       parent: null,
       base: null,
     },
-    ambient: [1.0, 1.0, 1.0],
+    ambient: [0.2, 0.2, 0.2],
     diffuse: [0.6, 0.6, 0.6],
     specular: [0.3, 0.3, 0.3],
   });
@@ -425,12 +393,31 @@ function main() {
   // creates default 3d per-pixel lighting shader
   dali.graphx.init();
 
+    var frogPosition = {
+      x: 0.0, y: 0.0, z: -1.5,
+    };
+
+    var cameraPosition = {
+      x: 0.0, y: 1.0, z: -2.0,
+    };
+
+    var at = vec3.fromValues(-cameraPosition.x,
+                             -cameraPosition.y,
+                             -cameraPosition.z);
+    vec3.normalize(at, at);
+    var right = vec3.fromValues(1, 0, 0);
+    var up = vec3.create();
+    vec3.cross(up, at, right);
+    vec3.normalize(up, up);
+
+    console.log(at);
+    console.log(up);
+    console.log(right);
+
     var o = Frog('img/HandleTex.png', frogMesh.dGUID, {
       transform: {
         options: {
-          position: {
-            x: 1.0, y: 0.2, z: -1.5,
-          },
+          position: frogPosition,
           scale: {
             x: 0.2, y: 0.2, z: 0.2
           },
@@ -439,27 +426,52 @@ function main() {
     });
     scene.addEntity(o);
 
-    // var camera = dali.graphx.g3D.PerspectiveCamera({
-    //   transform: {
-    //     options: {
-    //       position: {
-    //         x: 0.0, y: 0.75, z: -1.25,
-    //       }
-    //     },
-    //     parent: o.transform
-    //   },
-    //   lookAt: [0, 0, 1],
-    //   lookUp: [0, 1, 0],
-    //   eyeDistance: 0.5,
-    //   fovY: 0.5 * Math.PI,
-    // });
-    // scene.addEntity(camera);
-    // shader.setCamera(camera);
+    var camera1 = dali.graphx.g3D.PerspectiveCamera({
+      transform: {
+        options: {
+          position: cameraPosition
+        },
+        parent: o.transform
+      },
+      lookAt: at,
+      lookUp: up,
+      eyeDistance: 0.5,
+      fovY: 0.5 * Math.PI,
+    });
+
+    var camera = dali.graphx.g3D.PerspectiveCamera({
+      transform: {
+        options: {
+          position: {
+            x: 0.0, y: 1.5, z: 0.0,
+          },
+        },
+        // parent: o.transform,
+      },
+      lookAt: [0, -1, 0],
+      lookUp: [0, 0, 1],
+      eyeDistance: 0.5,
+      fovY: 0.5 * Math.PI,
+    });
+
+    var mainCamera = camera1;
+
+    scene.addEntity(camera);
+    scene.addEntity(camera1);
+    shader.setCamera(mainCamera);
+
+    // camera swapping on Shift
+    shader.addEventListener('keydown', function(event) {
+      if (event.code === 'Space') {
+        mainCamera = mainCamera === camera1 ? camera : camera1;
+        shader.setCamera(mainCamera);
+      }
+    });
 
     var ground = GroundGrid(
       { x: 4, y: 0, z: 4},
       0.4,
-      [1.0, 0, 0.0],
+      [0.0, 0.0, 0.0],
       [
         { zBound: 1, texture: 'img/grass-textures.jpg'},
         { zBound: 4, texture: 'img/asphalt_texture407.jpg'},
@@ -475,7 +487,7 @@ function main() {
       transform: {
         options: {
           position: {
-            x: 1.8, y: 0.1, z: -0.8
+            x: 1.8, y: 0.0, z: -0.8
           },
           scale: {
             x: 0.07, y: 0.07, z: 0.07
@@ -490,7 +502,7 @@ function main() {
       transform: {
         options: {
           position: {
-            x: 1.8, y: 0.1, z: -0.4
+            x: 1.8, y: 0.0, z: -0.4
           },
           scale: {
             x: 0.07, y: 0.07, z: 0.07
@@ -505,15 +517,17 @@ function main() {
       transform: {
         options: {
           position: {
-            x: -0.2, y: 0.0, z: 1.2
+            x: -1.0, y: 0.05, z: 1.2
           },
           scale: {
-            x: 0.07, y: 0.07, z: 0.07
+            x: 0.07, y: 0.21, z: 0.07
           },
         }
       }
     });
     scene.addEntity(o);
+
+    alert('Are you ready to play?');
 
     init();
   }).catch(function (err) {

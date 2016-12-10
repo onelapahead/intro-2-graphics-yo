@@ -8,25 +8,27 @@ var dali = {
   physx: {
     p3D: {}
   },
+  events: new Map(),
   audio: {},
+  canvas: document.getElementById('glCanvas'),
 };
 
-const objTypes = ['String', 'Number', 'Array', 'Object', 'Map'];
-objTypes.forEach(function(type) {
-  dali['is' + type] = function (obj) {
-    return (Object.prototype.toString.call(obj) === '[object ' + type + ']');
-  };
-});
-delete objTypes;
-
-const daliReg = new RegExp('dali', 'i');
-dali.isDaliObj = function(obj) {
-  return obj != null && obj.dGUID != null && obj.getType != null && obj.inherit != null && daliReg.test(obj.inherit);
-};
-
-// GUID GENERATOR
 (function() {
 
+  const objTypes = ['String', 'Number', 'Array', 'Object', 'Map', 'Function'];
+  objTypes.forEach(function(type) {
+    window.dali['is' + type] = function (obj) {
+      return (Object.prototype.toString.call(obj) === '[object ' + type + ']');
+    };
+  });
+  delete objTypes;
+
+  const daliReg = new RegExp('dali', 'i');
+  window.dali.isDaliObj = function(obj) {
+    return obj != null && obj.dGUID != null && obj.getType != null && obj.inherit != null && daliReg.test(obj.inherit);
+  };
+
+  // GUID GENERATOR
   var counter = 0;
   const N = 9;
   const T = 999;
@@ -42,6 +44,37 @@ dali.isDaliObj = function(obj) {
   function guid() {
     if (counter > T) counter = 0;
     return Array(N+1).join((Math.random(performance.now()).toString(36)+'00000000000000000').slice(2, 18)).slice(0, N) + pad(counter++, 3);
+  }
+
+  // EVENTS
+  var events = new Map();
+  function addEventListener(eventType, callback, data) {
+    if (!window.dali.isString(eventType)) throw 'Invalid event type: ' + eventType;
+    window.dali.canvas = window.dali.canvas || document.getElementById('glCanvas');
+    var type = eventType.toLowerCase();
+
+    function eventForwarder(handler) {
+      return function(event) {
+        console.log('WHEW EVENTS');
+        if (events.has(event.type)) {
+          var cbs = events.get(event.type);
+          for (var i = 0; i < cbs.length; i++) {
+            cbs[i](event);
+          }
+        }
+
+        if (handler != null && window.dali.isFunction(handler))
+          handler(event);
+      }
+    }
+
+    if (!events.has(type)) {
+      events.set(type, []); // make a priority queue
+      console.log(window.dali);
+      window.document['on' + type] = eventForwarder(window);
+    }
+    events.get(type).push(callback);
+
   }
 
   // BASE OBJECT
@@ -63,6 +96,12 @@ dali.isDaliObj = function(obj) {
       if (dali.isString(type))
         return (new RegExp(type.toLowerCase(), 'i')).test(self.inherit);
       return false;
+    };
+
+    self.addEventListener = function(eventType, callback, priority) {
+      addEventListener(eventType, callback, {
+        'priority': priority || 1, guid: self.dGUID
+      });
     };
 
     return self;
@@ -210,6 +249,7 @@ dali.Entity = function (options, base) {
   if (options == null || options.transform == null)
     self.transform = dali.EntityTransform();
   else {
+    // TODO REFACTOR THIS BULLSHIT
     self.transform = dali.EntityTransform(options.transform.options, options.transform.base, options.transform.parent);
   }
 
@@ -220,6 +260,8 @@ dali.Entity = function (options, base) {
 // ------------ EITHER POINTS TO SAME OBJECTS USED BY UNDERLYING
 // ------------ CANNON BODY (PHYSICS), OR ITS OWN IF IT DOESN'T
 // ------------ INTERACT (CAMERAS, UI, etc.)
+// TODO change to glMatrix math classes, only use cannon for physics
+// copy transform data back forth between draws and physics
 dali.EntityTransform = function (options, base, parent) {
   var self = dali.Object(base);
   self.setType('entitytransform');
@@ -313,11 +355,10 @@ dali.EntityTransform = function (options, base, parent) {
       rotation.quat(),
       position.vec3(),
       scale.vec3(),
-      vec3.fromValues(0, 0, 0) // TODO change to position?
+      position.vec3() // TODO change to position?
     );
     if (self.parent != null) {
-      console.log(self.dGUID + ' parent')
-      mat4.multiply(t, t, self.parent.toMatrix());
+      mat4.multiply(t, self.parent.toMatrix(), t);
     }
     return t;
   }

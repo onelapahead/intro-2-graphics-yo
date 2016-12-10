@@ -11,8 +11,7 @@
   // set up the webGL environment
   graphx.load = function() {
     // Get the canvas and context
-    var canvas = document.getElementById("myWebGLCanvas"); // get the js canvas
-    gl = canvas.getContext("webgl"); // get a webgl object from it
+    gl = dali.canvas.getContext("webgl"); // get a webgl object from it
     graphx.gl = gl;
 
     try {
@@ -395,7 +394,6 @@
         self.setUniform('uLightPositions[' + i + ']', light.transform.getPosition().vec3());
       }
 
-
       gl.depthMask(true); // z-buffer on
       var map = requests.opaque;
       var mesh, queue, bufferInfo;
@@ -503,8 +501,7 @@
   // graphx.load must be called first
   var mainCamera3d;
   // CAMERA ENTITY
-  // TODO Camera base class, children: Perspective, Orthographic
-  graphx.g3D.Camera = function(options, base) {
+    graphx.g3D.Camera = function(options, base) {
     var self = window.dali.Entity(options, base);
     self.setType('camera3d');
 
@@ -1036,7 +1033,7 @@
         depth = options.depth || 1;
 
     self.triangleData = function() {
-      var data = {
+      var triangles = {
         aVertexPosition: { size: 3, data: [] },
         aVertexNormal: { size: 3, data: [] },
         aVertexTextureCoords: { size: 2, data: [] },
@@ -1050,82 +1047,84 @@
       for (var l = -0.5; l <= 0.5; l++) {
         for (var i = -0.5; i < 0.5; i += dw) {
           for (var j = -0.5; j < 0.5; j+= dh) {
-            data.aVertexPosition.data.push(i, l, j);
-            data.aVertexPosition.data.push(i + dw, l, j);
-            data.aVertexPosition.data.push(i + dw, l, j + dh);
-            data.aVertexPosition.data.push(i, l, j + dh);
+            triangles.aVertexPosition.data.push(i, l, j);
+            triangles.aVertexPosition.data.push(i + dw, l, j);
+            triangles.aVertexPosition.data.push(i + dw, l, j + dh);
+            triangles.aVertexPosition.data.push(i, l, j + dh);
           
             var sign = l < 0 ? -1 : 1;
 
             for (var v = 0; v < 4; v++) {
-              data.aVertexNormal.data.push(0, sign, 0);
+              triangles.aVertexNormal.data.push(0, sign, 0);
             }
 
-            data.aVertexTextureCoords.data.push(0,0);
-            data.aVertexTextureCoords.data.push(1,0);
-            data.aVertexTextureCoords.data.push(1,1);
-            data.aVertexTextureCoords.data.push(0,1);
+            triangles.aVertexTextureCoords.data.push(0,0);
+            triangles.aVertexTextureCoords.data.push(1,0);
+            triangles.aVertexTextureCoords.data.push(1,1);
+            triangles.aVertexTextureCoords.data.push(0,1);
 
-            data.indices.data.push(triIndex, triIndex+1, triIndex+2);
-            data.indices.data.push(triIndex, triIndex+2, triIndex+3);
+            triangles.indices.data.push(triIndex, triIndex+1, triIndex+2);
+            triangles.indices.data.push(triIndex, triIndex+2, triIndex+3);
             triIndex += 4;
           }
         }
       }
 
+       // left and right
       for (var i = -0.5; i <= 0.5; i++) {
         for (var l = -0.5; l < 0.5; l += dl) {
           for (var j = -0.5; j < 0.5; j+= dh) {
-            data.aVertexPosition.data.push(i, l, j);
-            data.aVertexPosition.data.push(i, l + dl, j);
-            data.aVertexPosition.data.push(i, l + dl, j + dh);
-            data.aVertexPosition.data.push(i, l, j + dh);
+            triangles.aVertexPosition.data.push(i, l, j);
+            triangles.aVertexPosition.data.push(i, l + dl, j);
+            triangles.aVertexPosition.data.push(i, l + dl, j + dh);
+            triangles.aVertexPosition.data.push(i, l, j + dh);
           
             var sign = i < 0 ? -1 : 1;
 
             for (var v = 0; v < 4; v++) {
-              data.aVertexNormal.data.push(sign, 0, 0);
+              triangles.aVertexNormal.data.push(sign, 0, 0);
             }
 
-            data.aVertexTextureCoords.data.push(0,0);
-            data.aVertexTextureCoords.data.push(1,0);
-            data.aVertexTextureCoords.data.push(1,1);
-            data.aVertexTextureCoords.data.push(0,1);
+            triangles.aVertexTextureCoords.data.push(0,0);
+            triangles.aVertexTextureCoords.data.push(1,0);
+            triangles.aVertexTextureCoords.data.push(1,1);
+            triangles.aVertexTextureCoords.data.push(0,1);
 
-            data.indices.data.push(triIndex, triIndex+1, triIndex+2);
-            data.indices.data.push(triIndex+2, triIndex+3, triIndex);
+            triangles.indices.data.push(triIndex, triIndex+1, triIndex+2);
+            triangles.indices.data.push(triIndex+2, triIndex+3, triIndex);
             triIndex += 4;
           }
         }
       }
 
+      // front and back
       for (var j = -0.5; j <= 0.5; j++) {
         for (var l = -0.5; l < 0.5; l += dl) {
           for (var i = -0.5; i < 0.5; i += dw) {
-            data.aVertexPosition.data.push(i, l, j);
-            data.aVertexPosition.data.push(i, l + dl, j);
-            data.aVertexPosition.data.push(i + dw, l + dl, j);
-            data.aVertexPosition.data.push(i + dw, l, j);
+            triangles.aVertexPosition.data.push(i, l, j);
+            triangles.aVertexPosition.data.push(i, l + dl, j);
+            triangles.aVertexPosition.data.push(i + dw, l + dl, j);
+            triangles.aVertexPosition.data.push(i + dw, l, j);
           
             var sign = j < 0 ? -1 : 1;
 
             for (var v = 0; v < 4; v++) {
-              data.aVertexNormal.data.push(0, 0, sign);
+              triangles.aVertexNormal.data.push(0, 0, sign);
             }
 
-            data.aVertexTextureCoords.data.push(0,0);
-            data.aVertexTextureCoords.data.push(1,0);
-            data.aVertexTextureCoords.data.push(1,1);
-            data.aVertexTextureCoords.data.push(0,1);
+            triangles.aVertexTextureCoords.data.push(0,0);
+            triangles.aVertexTextureCoords.data.push(1,0);
+            triangles.aVertexTextureCoords.data.push(1,1);
+            triangles.aVertexTextureCoords.data.push(0,1);
 
-            data.indices.data.push(triIndex, triIndex+1, triIndex+2);
-            data.indices.data.push(triIndex, triIndex+2, triIndex+3);
+            triangles.indices.data.push(triIndex, triIndex+1, triIndex+2);
+            triangles.indices.data.push(triIndex, triIndex+2, triIndex+3);
             triIndex += 4;
           }
         }
       }
 
-      return data;
+      return triangles;
     };
 
     return self;
@@ -1153,7 +1152,6 @@
     var self = graphx.g3D.Mesh(base);
     self.setType('trimesh');
 
-    console.log(self.dGUID);
     if (options == null || options.url == null || !window.dali.isString(options.url))
       throw 'Invalid trimesh options: ' + options;
 
@@ -1167,7 +1165,7 @@
     self.triangleData = function() {
       // .obj parser
       // TODO add other file formats
-      var data = {
+      var triangles = {
         aVertexPosition: { size: 3, data: [] },
         aVertexNormal: { size: 3, data: [] },
         aVertexTextureCoords: { size: 2, data: [] },
@@ -1207,44 +1205,41 @@
             }
 
             if (elements[j] in tracker.hashindices) {
-              data.indices.data.push(tracker.hashindices[elements[j]]);
+              triangles.indices.data.push(tracker.hashindices[elements[j]]);
             } else {
 
               var vertex = elements[j].split('/');
 
               var v0 = (vertex[0] - 1) * 3;
-              data.aVertexPosition.data.push(+vertices[v0]);
-              data.aVertexPosition.data.push(+vertices[v0 + 1]);
-              data.aVertexPosition.data.push(+vertices[v0 + 2]);
+              triangles.aVertexPosition.data.push(+vertices[v0]);
+              triangles.aVertexPosition.data.push(+vertices[v0 + 1]);
+              triangles.aVertexPosition.data.push(+vertices[v0 + 2]);
 
               if (uvs.length) {
                 var v1 = (vertex[1] - 1) * 2;
-                data.aVertexTextureCoords.data.push(+uvs[v1]);
-                data.aVertexTextureCoords.data.push(+uvs[v1 + 1]);
+                triangles.aVertexTextureCoords.data.push(+uvs[v1]);
+                triangles.aVertexTextureCoords.data.push(+uvs[v1 + 1]);
               }
 
               var v2 = (vertex[2] - 1) * 3;
-              data.aVertexNormal.data.push(+normals[v2]);
-              data.aVertexNormal.data.push(+normals[v2 + 1]);
-              data.aVertexNormal.data.push(+normals[v2 + 2]);
+              triangles.aVertexNormal.data.push(+normals[v2]);
+              triangles.aVertexNormal.data.push(+normals[v2 + 1]);
+              triangles.aVertexNormal.data.push(+normals[v2 + 2]);
 
               tracker.hashindices[elements[j]] = tracker.index;
-              data.indices.data.push(tracker.index);
+              triangles.indices.data.push(tracker.index);
               tracker.index++;
             }
 
             if(j === 3 && quad) {
                 // add v0/t0/vn0 onto the second triangle
-                data.indices.data.push( tracker.hashindices[elements[0]]);
+                triangles.indices.data.push( tracker.hashindices[elements[0]]);
             }
           }
         }
       }
-      return data;
+      return triangles;
     };
-
-
-    // TODO
 
     return self;
   };
@@ -1289,161 +1284,3 @@
   };
 
 }) ();
-
-// define vertex shader in essl using es6 template strings
-dali.graphx.g3D.vShaderCodeDefault = `
-  attribute vec3 aVertexPosition; // vertex position
-  attribute vec3 aVertexNormal; // vertex normal
-  attribute vec2 aVertexTextureCoords; // vertex uv
-
-  uniform mat4 umMatrix; // the model matrix
-  uniform mat4 upvmMatrix; // the project view model matrix
-
-  varying vec3 vWorldPos; // interpolated world position of vertex
-  varying vec3 vVertexNormal; // interpolated normal for frag shader
-  varying highp vec2 vTextureCoords; // interpolated uv
-
-  void main(void) {
-
-      // vertex position
-      vec4 vWorldPos4 = umMatrix * vec4(aVertexPosition, 1.0);
-      vWorldPos = vec3(vWorldPos4.x,vWorldPos4.y,vWorldPos4.z);
-      gl_Position = upvmMatrix * vec4(aVertexPosition, 1.0);
-
-      // vertex normal (assume no non-uniform scale)
-      vec4 vWorldNormal4 = umMatrix * vec4(aVertexNormal, 0.0);
-      vVertexNormal = normalize(vec3(vWorldNormal4.x,vWorldNormal4.y,vWorldNormal4.z));
-
-      vTextureCoords = aVertexTextureCoords;
-  }
-`;
-
-// define fragment shader in essl using es6 template strings
-dali.graphx.g3D.fShaderCodeDefault = `
-  precision mediump float; // set float to medium precision
-
-  // eye location
-  uniform vec3 uEyePosition; // the eye's position in world
-
-  // lights informations
-  uniform int uNumLights; // actual number of lights
-  #define MAX_LIGHTS ` + dali.graphx.g3D.MAX_LIGHTS + ` // allowed max
-  uniform vec3 uLightPositions[MAX_LIGHTS]; // array of light positions
-  uniform vec3 uProductsAmbient[MAX_LIGHTS];
-  uniform vec3 uProductsDiffuse[MAX_LIGHTS];
-  uniform vec3 uProductsSpecular[MAX_LIGHTS];
-  uniform float uShininess;
-
-  // geometry properties
-  varying vec3 vWorldPos; // world xyz of fragment
-  varying vec3 vVertexNormal; // normal of fragment
-
-  varying highp vec2 vTextureCoords; // interpolated uv
-  uniform sampler2D uTexture; // texture sampler
-  uniform float uAlpha; // material alpha
-
-  void main(void) {
-    vec3 color = vec3(0.0, 0.0, 0.0);
-
-    vec3 E = normalize(uEyePosition - vWorldPos);
-    vec3 n = normalize(vVertexNormal);
-    for (int i = 0; i < MAX_LIGHTS; i++) {
-      if (i >= uNumLights) break;
-      vec3 L = normalize(uLightPositions[i] - vWorldPos);
-      vec3 H = normalize(L + E);
-
-      vec3 Idiff = uProductsDiffuse[i] * max(dot(n, L), 0.0);
-      Idiff = clamp(Idiff, 0.0, 1.0);
-
-      vec3 Ispec = uProductsSpecular[i] * pow(max(dot(n, H), 0.0), uShininess);
-      Ispec = clamp(Ispec, 0.0, 1.0);
-
-      color = clamp(color + uProductsAmbient[i] + Idiff + Ispec, 0.0, 1.0);
-    }
-
-    gl_FragColor = vec4(color, uAlpha) * texture2D(uTexture, vec2(vTextureCoords.s, vTextureCoords.t));
-  }
-`;
-
-// src:
-//   http://prideout.net/blog/?p=22
-dali.graphx.g3D.fShaderCodeCartoon = `
-  #extension GL_EXT_shader_texture_lod : enable
-  #extension GL_OES_standard_derivatives : enable
-
-  precision mediump float; // set float to medium precision
-
-  // eye location
-  uniform vec3 uEyePosition; // the eye's position in world
-
-  // lights informations
-  uniform int uNumLights; // actual number of lights
-  #define MAX_LIGHTS ` + dali.graphx.g3D.MAX_LIGHTS + ` // allowed max
-  uniform vec3 uLightPositions[MAX_LIGHTS]; // array of light positions
-  uniform vec3 uProductsAmbient[MAX_LIGHTS];
-  uniform vec3 uProductsDiffuse[MAX_LIGHTS];
-  uniform vec3 uProductsSpecular[MAX_LIGHTS];
-  uniform float uShininess;
-
-  // geometry properties
-  varying vec3 vWorldPos; // world xyz of fragment
-  varying vec3 vVertexNormal; // normal of fragment
-
-  varying highp vec2 vTextureCoords; // interpolated uv
-  uniform sampler2D uTexture; // texture sampler
-  uniform float uAlpha; // material alpha
-
-float stepmix(float edge0, float edge1, float E, float x) {
-    float T = clamp(0.5 * (x - edge0 + E) / E, 0.0, 1.0);
-    return mix(edge0, edge1, T);
-}
-
-
-  void main(void) {
-    vec3 color = vec3(0.0, 0.0, 0.0);
-    const float A = 0.1;
-    const float B = 0.3;
-    const float C = 0.6;
-    const float D = 1.0;
-
-    vec3 Eye = normalize(uEyePosition - vWorldPos);
-    vec3 n = normalize(vVertexNormal);
-    for (int i = 0; i < MAX_LIGHTS; i++) {
-      if (i >= uNumLights) break;
-      vec3 L = normalize(uLightPositions[i] - vWorldPos);
-      vec3 H = normalize(L + Eye);
-
-      float df = max(dot(n, L), 0.0);
-      float sf = pow(max(dot(n, H), 0.0), uShininess);
-      float E = fwidth(df);
-
-      if (df > A - E && df < A + E) df = stepmix(A, B, E, df);
-      else if (df > B - E && df < B + E) df = stepmix(B, C, E, df);
-      else if (df > C - E && df < C + E) df = stepmix(C, D, E, df);
-      else if (df < A) df = 0.0;
-      else if (df < B) df = B;
-      else if (df < C) df = C;
-      else df = D;
-
-      E = fwidth(sf);
-      if (sf > 0.5 - E && sf < 0.5 + E)
-      {
-        sf = smoothstep(0.5 - E, 0.5 + E, sf);
-      }
-      else
-      {
-          sf = step(0.5, sf);
-      }
-
-      vec3 Idiff = uProductsDiffuse[i] * df;
-      Idiff = clamp(Idiff, 0.0, 1.0);
-
-      vec3 Ispec = uProductsSpecular[i] * sf;
-      Ispec = clamp(Ispec, 0.0, 1.0);
-
-      color = clamp(color + uProductsAmbient[i] + Idiff + Ispec, 0.0, 1.0);
-    }
-
-    gl_FragColor = vec4(color, uAlpha) * texture2D(uTexture, vec2(vTextureCoords.s, vTextureCoords.t));
-  }
-`;
