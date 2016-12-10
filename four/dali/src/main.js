@@ -379,11 +379,6 @@ function main() {
       });
       shader.addMesh(carMesh);
 
-      var carMesh1 = dali.graphx.g3D.TriMesh({
-        url: 'meta/Lincoln.obj'
-      });
-      shader.addMesh(carMesh1);
-
       var logMesh = dali.graphx.g3D.TriMesh({
         url: 'meta/tree.obj'
       });
@@ -394,6 +389,7 @@ function main() {
       dali.graphx.init();
       boxMesh.initAABB();
       frogMesh.initAABB();
+      carMesh.initAABB();
 
       var frogPosition = {
         x: 0.0, y: 0.0, z: -1.5,
@@ -499,7 +495,7 @@ function main() {
       });
       scene.addEntity(o);
 
-      o = Car(carMesh1.dGUID, -0.5, {
+      o = Car(carMesh.dGUID, -0.5, {
         // textureUrl: 'img/car.gif',
         transform: {
           options: {

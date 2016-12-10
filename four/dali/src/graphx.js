@@ -454,7 +454,7 @@
       translucent: new Map()
     };
 
-    // TODO decouple mesh from shader....
+    // TODO decouple mesh cache from shader....
     var meshMap = new Map();
     self.addMesh = function(mesh) {
       if (!window.dali.isDaliObj(mesh) || !mesh.isType('mesh'))
@@ -670,7 +670,7 @@
     return self;
   };
 
-  var texture3ds = window.dali.ObjectManager('texture3d');
+  var texture3ds = window.dali.ObjectManager('texture3d'); // texture cache for url-image-based textures
   // graphx.load must be called first
   graphx.g3D.Texture = function(options, base) {
     var self = window.dali.Object(base);
@@ -706,16 +706,15 @@
 
     var glTexture;
     if (options.url != null) {
-      if (texture3ds.hasObj(options.url))
-        return texture3ds.getObj(options.url);
+      if (texture3ds.hasObj(options.url)) // if already made texture from URL...
+        return texture3ds.getObj(options.url); // return cached texture
 
+      // create image texture and cache it
       self.dGUID = options.url;
       var img = window.dali.resources.ResourceManager.main.getResource(options.url);
       createImageTexture(img.getImg());
       isTranslucent = img.isTranslucent;
       texture3ds.add(self);
-
-      // TODO
     } else if (options.r != null && options.g != null && options.b != null && options.a != null) {
       createSolidTexture(options.r, options.g, options.b, options.a);
     } else throw 'Invalid texture2 options: ' + options;
@@ -807,7 +806,7 @@
       options.rotation = rot;
     }
 
-    // TODO make model transform from initial position, rotation, scale of model
+    // TODO get center from init AABB
     mat4.fromRotationTranslationScaleOrigin(
       transform, 
       options.rotation,
@@ -896,7 +895,8 @@
 
     // O(n)
     self.initAABB = function() {
-      // TODO vertex scan of min/max x, y, z values
+      // TODO if mesh isnt centered,
+      // generate translation matrix for Model
       oAABB = {
         min: vec3.fromValues(Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE),
         max: vec3.fromValues(Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE)
