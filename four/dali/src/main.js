@@ -23,12 +23,12 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
       numZ = dimensions.z / step;
 
   self.quantize = function(position) {
-
+    // TODO
   };
 
   self.localize = function(pair) {
     var i = pair[0], j = pair[1];
-
+    // TODO
   };
 
   console.log(step);
@@ -356,180 +356,180 @@ function main() {
   // load images, json, audio, etc.
     // add scene objects
   dali.resources.load(resources)
-  .then(function() {
+    .then(function() {
 
-  var frogMesh = dali.graphx.g3D.TriMesh({
-    url: 'meta/DoubleDamageFrog.obj'
-  });
-  shader.addMesh(frogMesh);
+      var frogMesh = dali.graphx.g3D.TriMesh({
+        url: 'meta/DoubleDamageFrog.obj'
+      });
+      shader.addMesh(frogMesh);
 
-  var boxMesh = dali.graphx.g3D.BoxMesh({
-    // width: 6,
-    // height: 2,
-    // depth: 2
-    width: 1,
-    height: 1,
-    depth: 1
-    
-  });
-  shader.addMesh(boxMesh);
+      var boxMesh = dali.graphx.g3D.BoxMesh({
+        // width: 6,
+        // height: 2,
+        // depth: 2
+        width: 1,
+        height: 1,
+        depth: 1
+        
+      });
+      shader.addMesh(boxMesh);
 
-  var carMesh = dali.graphx.g3D.TriMesh({
-    url: 'meta/Lincoln.obj'
-  });
-  shader.addMesh(carMesh);
+      var carMesh = dali.graphx.g3D.TriMesh({
+        url: 'meta/Lincoln.obj'
+      });
+      shader.addMesh(carMesh);
 
-  var carMesh1 = dali.graphx.g3D.TriMesh({
-    url: 'meta/Lincoln.obj'
-  });
-  shader.addMesh(carMesh1);
+      var carMesh1 = dali.graphx.g3D.TriMesh({
+        url: 'meta/Lincoln.obj'
+      });
+      shader.addMesh(carMesh1);
 
-  var logMesh = dali.graphx.g3D.TriMesh({
-    url: 'meta/tree.obj'
-  });
-  shader.addMesh(logMesh);
+      var logMesh = dali.graphx.g3D.TriMesh({
+        url: 'meta/tree.obj'
+      });
+      shader.addMesh(logMesh);
 
-  // initalize shader programs, b/c none were added,
-  // creates default 3d per-pixel lighting shader
-  dali.graphx.init();
+      // initalize shader programs, b/c none were added,
+      // creates default 3d per-pixel lighting shader
+      dali.graphx.init();
+      boxMesh.initAABB();
+      frogMesh.initAABB();
 
-    var frogPosition = {
-      x: 0.0, y: 0.0, z: -1.5,
-    };
+      var frogPosition = {
+        x: 0.0, y: 0.0, z: -1.5,
+      };
 
-    var cameraPosition = {
-      x: 0.0, y: 1.0, z: -2.0,
-    };
+      var cameraPosition = {
+        x: 0.0, y: 1.0, z: -2.0,
+      };
 
-    var at = vec3.fromValues(-cameraPosition.x,
-                             -cameraPosition.y,
-                             -cameraPosition.z);
-    vec3.normalize(at, at);
-    var right = vec3.fromValues(1, 0, 0);
-    var up = vec3.create();
-    vec3.cross(up, at, right);
-    vec3.normalize(up, up);
+      var at = vec3.fromValues(-cameraPosition.x,
+                               -cameraPosition.y,
+                               -cameraPosition.z);
+      vec3.normalize(at, at);
+      var right = vec3.fromValues(1, 0, 0);
+      var up = vec3.create();
+      vec3.cross(up, at, right);
+      vec3.normalize(up, up);
 
-    console.log(at);
-    console.log(up);
-    console.log(right);
+      console.log(at);
+      console.log(up);
+      console.log(right);
 
-    var o = Frog('img/HandleTex.png', frogMesh.dGUID, {
-      transform: {
-        options: {
-          position: frogPosition,
-          scale: {
-            x: 0.2, y: 0.2, z: 0.2
-          },
+      var o = Frog('img/HandleTex.png', frogMesh.dGUID, {
+        transform: {
+          options: {
+            position: frogPosition,
+            scale: {
+              x: 0.2, y: 0.2, z: 0.2
+            },
+          }
         }
-      }
-    });
-    scene.addEntity(o);
+      });
+      scene.addEntity(o);
 
-    var camera1 = dali.graphx.g3D.PerspectiveCamera({
-      transform: {
-        options: {
-          position: cameraPosition
+      var camera1 = dali.graphx.g3D.PerspectiveCamera({
+        transform: {
+          options: {
+            position: cameraPosition
+          },
+          parent: o.transform
         },
-        parent: o.transform
-      },
-      lookAt: at,
-      lookUp: up,
-      eyeDistance: 0.5,
-      fovY: 0.5 * Math.PI,
-    });
+        lookAt: at,
+        lookUp: up,
+        eyeDistance: 0.5,
+        fovY: 0.5 * Math.PI,
+      });
 
-    var camera = dali.graphx.g3D.PerspectiveCamera({
-      transform: {
-        options: {
-          position: {
-            x: 0.0, y: 1.5, z: 0.0,
+      var camera = dali.graphx.g3D.PerspectiveCamera({
+        transform: {
+          options: {
+            position: {
+              x: 0.0, y: 1.5, z: 0.0,
+            },
           },
+          // parent: o.transform,
         },
-        // parent: o.transform,
-      },
-      lookAt: [0, -1, 0],
-      lookUp: [0, 0, 1],
-      eyeDistance: 0.5,
-      fovY: 0.5 * Math.PI,
-    });
+        lookAt: [0, -1, 0],
+        lookUp: [0, 0, 1],
+        eyeDistance: 0.5,
+        fovY: 0.5 * Math.PI,
+      });
 
-    var mainCamera = camera1;
+      var mainCamera = camera1;
 
-    scene.addEntity(camera);
-    scene.addEntity(camera1);
-    shader.setCamera(mainCamera);
+      scene.addEntity(camera);
+      scene.addEntity(camera1);
+      shader.setCamera(mainCamera);
 
-    // camera swapping on Shift
-    shader.addEventListener('keydown', function(event) {
-      if (event.code === 'Space') {
-        mainCamera = mainCamera === camera1 ? camera : camera1;
-        shader.setCamera(mainCamera);
-      }
-    });
-
-    var ground = GroundGrid(
-      { x: 4, y: 0, z: 4},
-      0.4,
-      [0.0, 0.0, 0.0],
-      [
-        { zBound: 1, texture: 'img/grass-textures.jpg'},
-        { zBound: 4, texture: 'img/asphalt_texture407.jpg'},
-        { zBound: 5, texture: 'img/grass-textures.jpg' },
-        { zBound: 9, texture: 'img/water.jpg' },
-        { zBound: 10, texture: 'img/fire.jpg', texture1: 'img/grass-textures.jpg' },
-      ],
-      boxMesh.dGUID
-    );
-    scene.addEntity(ground);
-
-    o = Car(carMesh.dGUID, -0.5, {
-      transform: {
-        options: {
-          position: {
-            x: 1.8, y: 0.0, z: -0.8
-          },
-          scale: {
-            x: 0.07, y: 0.07, z: 0.07
-          },
+      // camera swapping on Shift
+      shader.addEventListener('keydown', function(event) {
+        if (event.code === 'Space') {
+          mainCamera = mainCamera === camera1 ? camera : camera1;
+          shader.setCamera(mainCamera);
         }
-      }
-    });
-    scene.addEntity(o);
+      });
 
-    o = Car(carMesh1.dGUID, -0.5, {
-      // textureUrl: 'img/car.gif',
-      transform: {
-        options: {
-          position: {
-            x: 1.8, y: 0.0, z: -0.4
-          },
-          scale: {
-            x: 0.07, y: 0.07, z: 0.07
-          },
+      var ground = GroundGrid(
+        { x: 4, y: 0, z: 4},
+        0.4,
+        [0.0, 0.0, 0.0],
+        [
+          { zBound: 1, texture: 'img/grass-textures.jpg'},
+          { zBound: 4, texture: 'img/asphalt_texture407.jpg'},
+          { zBound: 5, texture: 'img/grass-textures.jpg' },
+          { zBound: 9, texture: 'img/water.jpg' },
+          { zBound: 10, texture: 'img/fire.jpg', texture1: 'img/grass-textures.jpg' },
+        ],
+        boxMesh.dGUID
+      );
+      scene.addEntity(ground);
+
+      o = Car(carMesh.dGUID, -0.5, {
+        transform: {
+          options: {
+            position: {
+              x: 1.8, y: 0.0, z: -0.8
+            },
+            scale: {
+              x: 0.07, y: 0.07, z: 0.07
+            },
+          }
         }
-      }
-    });
-    scene.addEntity(o);
+      });
+      scene.addEntity(o);
 
-    o = Log(logMesh.dGUID, 0.5, {
-      textureUrl: 'img/w3.jpg',
-      transform: {
-        options: {
-          position: {
-            x: -1.0, y: 0.05, z: 1.2
-          },
-          scale: {
-            x: 0.07, y: 0.21, z: 0.07
-          },
+      o = Car(carMesh1.dGUID, -0.5, {
+        // textureUrl: 'img/car.gif',
+        transform: {
+          options: {
+            position: {
+              x: 1.8, y: 0.0, z: -0.4
+            },
+            scale: {
+              x: 0.07, y: 0.07, z: 0.07
+            },
+          }
         }
-      }
-    });
-    scene.addEntity(o);
+      });
+      scene.addEntity(o);
 
-    alert('Are you ready to play?');
+      o = Log(logMesh.dGUID, 0.5, {
+        textureUrl: 'img/w3.jpg',
+        transform: {
+          options: {
+            position: {
+              x: -1.0, y: 0.05, z: 1.2
+            },
+            scale: {
+              x: 0.07, y: 0.21, z: 0.07
+            },
+          }
+        }
+      });
+      scene.addEntity(o);
 
-    init();
+      init();
   }).catch(function (err) {
     console.error(err);
   });

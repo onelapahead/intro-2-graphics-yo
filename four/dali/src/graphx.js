@@ -454,6 +454,7 @@
       translucent: new Map()
     };
 
+    // TODO decouple mesh from shader....
     var meshMap = new Map();
     self.addMesh = function(mesh) {
       if (!window.dali.isDaliObj(mesh) || !mesh.isType('mesh'))
@@ -838,19 +839,19 @@
     //   shader3d.addMesh(self);
     // }
 
+    var triangles;
     self.initBuffers = function() {
-      var data = self.triangleData();
-      createBufferInfo(data);
+      triangles = self.triangleData();
+      createBufferInfo();
     };
 
-    function createBufferInfo(data) {
-      data = data.data || data;
+    function createBufferInfo() {
       bufferInfo = {};
-      bufferInfo.attribs = createAttribs(data);
-      bufferInfo.size = data.indices.data.length;
+      bufferInfo.attribs = createAttribs(triangles);
+      bufferInfo.size = triangles.indices.data.length;
       bufferInfo.indices = gl.createBuffer();
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufferInfo.indices);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(data.indices.data), gl.STATIC_DRAW);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangles.indices.data), gl.STATIC_DRAW);
       // console.log(bufferInfo);
       return bufferInfo;
     };
@@ -881,20 +882,48 @@
     self.getBufferInfo = function () { return bufferInfo; };
 
     // n - number of vertices
-    var AABB, AABS, oAABB;
+    var AABB, AABS;
+
+    self.setAABB = function(_AABB) {
+      // TODO error check
+      oAABB = _AABB;
+    };
+
+    self.setAABS = function(_AABS) {
+      // TODO error check
+      AABS = _AABS;
+    };
 
     // O(n)
     self.initAABB = function() {
       // TODO vertex scan of min/max x, y, z values
+      oAABB = {
+        min: vec3.fromValues(Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE),
+        max: vec3.fromValues(Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE)
+      };
+
+      var vertices = triangles.aVertexPosition.data;
+      for (var i = 0; i < vertices.length; i += 3) {
+        for (var o = 0; o < 3; o++) {
+          if (vertices[i + o] < oAABB.min[o])
+            oAABB.min[o] = vertices[i+o];
+          if (vertices[i + o] > oAABB.max[o])
+            oAABB.max[o] = vertices[i+o];
+        }
+      }
+
+      console.log(oAABB);
     };
 
-    // O(1)
+    // O(1) - update
     self.updateAABB = function() {
-
       // TODO Use transform to rotate oAABB
       // determine AABB from 8-vertices of
       // rotated oAABB
+    };
 
+    self.getAABB = function() {
+      return AABB;
     };
 
     // O(1)
@@ -906,6 +935,9 @@
     self.initAABS = function() {
       // TODO vertex scan of largest distance
     };
+
+    // O(1) - doesn't require updating, its a sphere
+    self.getAABS = function() { return AABS; };
 
     return self;
   };
