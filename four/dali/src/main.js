@@ -19,16 +19,22 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
   });
   self.setType('groundgrid');
 
-  var numX = dimensions.x / step,
-      numZ = dimensions.z / step;
+  var numX = Math.floor(dimensions.x / step),
+      numZ = Math.floor(dimensions.z / step);
 
-  self.quantize = function(position) {
-    // TODO
+  self.quantize = function(x, z) {
+    console.log(ll);
+    console.log(x); 
+    console.log(z);
+    var i = Math.floor((x - ll.x) / step),
+        j = Math.floor((z - ll.z) / step);
+    return [i, j];
   };
 
-  self.localize = function(pair) {
-    var i = pair[0], j = pair[1];
-    // TODO
+  self.localize = function(i, j) {
+    var x = ll.x + step * i + step/2,
+        z = ll.z + step * j + step/2;
+    return [x, 0, z];
   };
 
   console.log(step);
@@ -384,87 +390,15 @@ function main() {
       });
       shader.addMesh(logMesh);
 
-      // initalize shader programs, b/c none were added,
-      // creates default 3d per-pixel lighting shader
+      // initalize shaders, meshes, buffers
       dali.graphx.init();
+
+      // AABBs
       boxMesh.initAABB();
       frogMesh.initAABB();
       carMesh.initAABB();
 
-      var frogPosition = {
-        x: 0.0, y: 0.0, z: -1.5,
-      };
-
-      var cameraPosition = {
-        x: 0.0, y: 1.0, z: -2.0,
-      };
-
-      var at = vec3.fromValues(-cameraPosition.x,
-                               -cameraPosition.y,
-                               -cameraPosition.z);
-      vec3.normalize(at, at);
-      var right = vec3.fromValues(1, 0, 0);
-      var up = vec3.create();
-      vec3.cross(up, at, right);
-      vec3.normalize(up, up);
-
-      console.log(at);
-      console.log(up);
-      console.log(right);
-
-      var o = Frog('img/HandleTex.png', frogMesh.dGUID, {
-        transform: {
-          options: {
-            position: frogPosition,
-            scale: {
-              x: 0.2, y: 0.2, z: 0.2
-            },
-          }
-        }
-      });
-      scene.addEntity(o);
-
-      var camera1 = dali.graphx.g3D.PerspectiveCamera({
-        transform: {
-          options: {
-            position: cameraPosition
-          },
-          parent: o.transform
-        },
-        lookAt: at,
-        lookUp: up,
-        eyeDistance: 0.5,
-        fovY: 0.5 * Math.PI,
-      });
-
-      var camera = dali.graphx.g3D.PerspectiveCamera({
-        transform: {
-          options: {
-            position: {
-              x: 0.0, y: 1.5, z: 0.0,
-            },
-          },
-          // parent: o.transform,
-        },
-        lookAt: [0, -1, 0],
-        lookUp: [0, 0, 1],
-        eyeDistance: 0.5,
-        fovY: 0.5 * Math.PI,
-      });
-
-      var mainCamera = camera1;
-
-      scene.addEntity(camera);
-      scene.addEntity(camera1);
-      shader.setCamera(mainCamera);
-
-      // camera swapping on Shift
-      shader.addEventListener('keydown', function(event) {
-        if (event.code === 'Space') {
-          mainCamera = mainCamera === camera1 ? camera : camera1;
-          shader.setCamera(mainCamera);
-        }
-      });
+      // GameObjects
 
       var ground = GroundGrid(
         { x: 4, y: 0, z: 4},
@@ -495,8 +429,7 @@ function main() {
       });
       scene.addEntity(o);
 
-      o = Car(carMesh.dGUID, -0.5, {
-        // textureUrl: 'img/car.gif',
+      var o = Car(carMesh.dGUID, -0.5, {
         transform: {
           options: {
             position: {
@@ -524,6 +457,88 @@ function main() {
         }
       });
       scene.addEntity(o);
+
+      // Player and Camera objects
+
+      // Setup follow camera to look at frog
+      var frogPosition = {
+        x: 0.0, y: 0.0, z: -1.5,
+      };
+      console.log(frogPosition);
+      var pair = ground.quantize(frogPosition.x, frogPosition.z);
+      console.log(pair);
+      pair = ground.localize(pair[0], pair[1]);
+      frogPosition.x = pair[0];
+      frogPosition.z = pair[2];
+      console.log(pair);
+      delete pair;
+      var cameraPosition = {
+        x: 0.0, y: 1.0, z: -2.0,
+      };
+      var at = vec3.fromValues(-cameraPosition.x,
+                               -cameraPosition.y,
+                               -cameraPosition.z);
+      vec3.normalize(at, at);
+      var right = vec3.fromValues(1, 0, 0);
+      var up = vec3.create();
+      vec3.cross(up, at, right);
+      vec3.normalize(up, up);
+
+      var frog = Frog('img/HandleTex.png', frogMesh.dGUID, {
+        transform: {
+          options: {
+            position: frogPosition,
+            scale: {
+              x: 0.2, y: 0.2, z: 0.2
+            },
+          }
+        }
+      });
+      scene.addEntity(frog);
+
+      frogPosition = frog.transform.getPosition();
+      console.log(ground.quantize(frogPosition.x, frogPosition.z));
+
+      var cameraFollow = dali.graphx.g3D.PerspectiveCamera({
+        transform: {
+          options: {
+            position: cameraPosition
+          },
+          parent: frog.transform
+        },
+        lookAt: at,
+        lookUp: up,
+        eyeDistance: 0.5,
+        fovY: 0.5 * Math.PI,
+      });
+
+      var cameraTop = dali.graphx.g3D.PerspectiveCamera({
+        transform: {
+          options: {
+            position: {
+              x: 0.0, y: 1.5, z: 0.0,
+            },
+          },
+        },
+        lookAt: [0, -1, 0],
+        lookUp: [0, 0, 1],
+        eyeDistance: 0.5,
+        fovY: 0.5 * Math.PI,
+      });
+
+      var mainCamera = cameraFollow;
+
+      scene.addEntity(cameraTop);
+      scene.addEntity(cameraFollow);
+      shader.setCamera(mainCamera);
+
+      // camera swapping on Space
+      scene.addEventListener('keydown', function(event) {
+        if (event.code === 'Space') {
+          mainCamera = mainCamera === cameraFollow ? cameraTop : cameraFollow;
+          shader.setCamera(mainCamera);
+        }
+      });
 
       init();
   }).catch(function (err) {

@@ -55,7 +55,6 @@ var dali = {
 
     function eventForwarder(handler) {
       return function(event) {
-        console.log('WHEW EVENTS');
         if (events.has(event.type)) {
           var cbs = events.get(event.type);
           for (var i = 0; i < cbs.length; i++) {
@@ -71,7 +70,7 @@ var dali = {
     if (!events.has(type)) {
       events.set(type, []); // make a priority queue
       console.log(window.dali);
-      window.document['on' + type] = eventForwarder(window);
+      window.document['on' + type] = eventForwarder(window.document['on' + type]);
     }
     events.get(type).push(callback);
 
@@ -370,8 +369,6 @@ dali.EntityTransform = function (options, base, parent) {
 dali.Renderable = function (base) {
   var self = dali.Object(base);
   self.setType('renderable');
-
-  // TODO render order, render, etc.
 
   self.requestRender = function() {
     console.log('You should override requestRender!');
