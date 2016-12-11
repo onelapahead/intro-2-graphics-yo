@@ -143,6 +143,29 @@ dali.ObjectManager = function(objType, base) {
     throw ('Cannot insert: ' + object);
   };
 
+  self.remove = function (object) {
+
+    // remove from type map
+    var typeQueue = typeMap.get(object.getType());
+    for (var i = 0; i < typeQueue.length; i++) {
+      if (typeQueue[i].dGUID === object.dGUID) {
+        typeQueue.splice(i, 1);
+        break;
+      }
+    }
+
+    // remove from objects map
+    objects.delete(object.dGUID);
+
+    // remove from queue
+    for (var i = 0; i < queue.length; i++) {
+      if (queue[i].guid === object.dGUID) {
+        queue.splice(i, 1);
+        break;
+      }
+    }
+  };
+
   self.size = function() { return queue.length; };
 
   self.hasObj = function (guid) {

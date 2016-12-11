@@ -11,6 +11,8 @@
 
     self.addEntity = function(entity) { entities.add(entity); };
 
+    self.removeEntity = function(entity) { entities.remove(entity); };
+
     self.update = function(dt) {
       for (var entity of entities) {
         entity._update(dt);

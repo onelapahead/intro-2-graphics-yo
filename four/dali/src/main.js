@@ -15,6 +15,14 @@ var frogMaterial = dali.graphx.Material({
   shininess: 64.0,
 });
 
+var treeMaterial = dali.graphx.Material({
+  ambient: [0.6, 0.6, 0.6],
+  diffuse: [1.0, 1.0, 1.0],
+  specular: [0.3, 0.3, 0.3],
+  alpha: 1.0,
+  shininess: 32.0,
+});
+
 var ground;
 function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
   var self = dali.Entity({ 
@@ -30,6 +38,13 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
 
   var numX = Math.floor(dimensions.x / step),
       numZ = Math.floor(dimensions.z / step);
+
+  self.snap = function(position) {
+    var pair = self.quantize(position.x, position.z);
+    pair = self.localize(pair[0], pair[1]);
+    position.x = pair[0];
+    position.z = pair[2];
+  };
 
   self.quantize = function(x, z) {
     // console.log('x: ' + x + ', z: ' + z);
@@ -86,7 +101,7 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
       if (j === section.zBound && secPtr < sections.length) {
         section = sections[secPtr++];
       }
-      if (secPtr == sections.length && i % 2 == 0)
+      if (secPtr == sections.length && i % 2 == 1)
         texture = section.texture1;
       else
         texture = section.texture;
@@ -156,15 +171,13 @@ function GroundTile(textureUrl, meshId, options) {
 function Player(options) {
   var self = dali.Entity(options);
 
-  var position = self.transform.getPosition();
-  var pair = ground.quantize(position.x, position.z);
+  var pos = self.transform.getPosition();
+  ground.snap(pos);
+  var pair = ground.quantize(pos.x, pos.z);
   var i = pair[0], j = pair[1];
-  pair = ground.localize(i, j);
-  position.x = pair[0];
-  position.z = pair[2];
-  position = null;
-  delete position;
   delete pair;
+  pos = null;
+  delete pos;
 
  var groundMax = ground.getGridBounds().max;
   var keyMap = new Map();
@@ -249,9 +262,10 @@ function Frog(textureUrl, meshId, options) {
   // });
 
   var mat = frogMaterial;
-  var texture = dali.graphx.g3D.Texture({
-    url: textureUrl
-  });
+  // var texture = dali.graphx.g3D.Texture({
+  //   url: textureUrl
+  // });
+  var texture = defaultMaterial;
   var model = dali.graphx.g3D.Model({
     meshId: meshId,
     eTransform: self.transform,
@@ -268,14 +282,29 @@ function Frog(textureUrl, meshId, options) {
   return self;
 }
 
-function Generator(object, meshId, speedLow, speedHigh, options) {
-//TODO
+function Generator(generate, timeLow, timeHigh, options) {
   var self = dali.Entity(options);
+  self.setType('generator');
+
+  ground.snap(self.transform.getPosition());
+
+  var elapsed = timeLow;
+  self.update = function(dt) {
+    elapsed += dt;
+
+    // TODO get better random number generator
+    if (elapsed > timeLow && Math.random() < ((elapsed - timeLow) / (timeHigh - timeLow))) { // lerp likelihood
+      console.log('elapsed: ' + elapsed);
+      elapsed = 0.0;
+      generate(self.transform);
+    }
+
+  };
 
   return self;
 }
 
-function Mover(meshId, _speed, options) {
+function Mover(axis, meshId, _speed, options) {
   var self = dali.Entity(options);
 
   var speed = _speed;
@@ -283,7 +312,9 @@ function Mover(meshId, _speed, options) {
   var texture;
   if (options != null && options.textureUrl != null && dali.isString(options.textureUrl))
     texture = dali.graphx.g3D.Texture({ url: options.textureUrl });
-  else {
+  else if (options.textureCreater != null && dali.isFunction(options.textureCreater)){
+    texture = options.textureCreater();
+  } else {
     texture = dali.graphx.g3D.Texture({
       r: Math.random() * 255, g: Math.random() * 255, b: Math.random() * 255, a: 255
     });
@@ -293,8 +324,9 @@ function Mover(meshId, _speed, options) {
     eTransform: self.transform,
   });
 
+  options = options || {};
   var renderer = dali.graphx.g3D.Renderable3D({
-    'material': defaultMaterial,
+    'material': options.material || defaultMaterial,
     'texture': texture,
     'model': model
   });
@@ -306,7 +338,7 @@ function Mover(meshId, _speed, options) {
 
     _self.update = function(dt) {
       var pos = self.transform.getPosition();
-      pos.x += dt * speed;
+      pos[axis] += dt * speed;
     };
 
     return _self;
@@ -315,22 +347,30 @@ function Mover(meshId, _speed, options) {
   return self;
 }
 
-function Log(meshId, _speed, options) {
+function Log(axis, meshId, _speed, options) {
   var sign = _speed < 0 ? -1 : 1;
+  var dir = Math.random() < 0.5 ? -1 : 1;
   options = options || {};
+  options.material = treeMaterial;
   options.transform = options.transform || {};
   options.transform.options = options.transform.options || {};
   options.transform.options.axes = {
-    z: sign * 90,
+    z: dir * 90,
+    x: 90
+  };
+  options.textureCreater = function() {
+    return dali.graphx.g3D.Texture({
+      r: 195, g: 131, b: 76, a: 255
+    });
   };
 
-  var self = Mover(meshId, _speed, options);
+  var self = Mover(axis, meshId, _speed, options);
   self.setType('log');
 
   return self;
 }
 
-function Car(meshId, _speed, options) {
+function Car(axis, meshId, _speed, options) {
   var sign = _speed < 0 ? -1 : 1;
   options = options || {};
   options.transform = options.transform || {};
@@ -339,7 +379,7 @@ function Car(meshId, _speed, options) {
     y: sign * 90,
   };
 
-  var self = Mover(meshId, _speed, options);
+  var self = Mover(axis, meshId, _speed, options);
   self.setType('car');
   return self;
 }
@@ -458,6 +498,7 @@ function main() {
       });
       shader.addMesh(frogMesh);
 
+      // for the ground, thin boxes
       var boxMesh = dali.graphx.g3D.BoxMesh({
         // width: 6,
         // height: 2,
@@ -487,8 +528,7 @@ function main() {
       frogMesh.initAABB();
       carMesh.initAABB();
 
-      // GameObjects
-
+      // GROUND
       ground = GroundGrid(
         { x: 4.4, y: 4.4, z: 4.4},
         0.4,
@@ -504,54 +544,201 @@ function main() {
       );
       scene.addEntity(ground);
 
-      o = Car(carMesh.dGUID, -0.5, {
+
+      // CAR GENERATORS
+      function createCarGenerator(axis, speed, maxGroup, modelLength, offset) {
+        var sign = speed < 0 ? -1 : 1;
+        maxGroup = maxGroup || 1;
+        modelLength = modelLength || 0;
+        return function (transform) {
+          var groupSize = Math.random() * maxGroup;
+          var generatorPos = transform.getPosition();
+          var carPos = {
+            x: generatorPos.x, y: generatorPos.y, z: generatorPos.z
+          };
+          carPos[axis] -= sign * modelLength;
+          for (var i = 0; i < groupSize; i++) {
+            carPos[axis] -= sign * offset;
+            var car = Car(axis, carMesh.dGUID, speed, {
+              transform: {
+                options: {
+                  position: {
+                    x: carPos.x, y: carPos.y, z: carPos.z
+                  },
+                  scale: {
+                    x: 0.07, y: 0.07, z: 0.07
+                  },
+                }
+              }
+            });
+            carPos[axis] -= sign * modelLength;
+
+            var bounds = ground.getWorldBounds();
+
+            // make car destroy itself after it crosses the opposite bounds
+            car.addUpdatable((function(car) {
+              var self = dali.Updatable();
+
+              self.update = function(dt) {
+                var position = car.transform.getPosition();
+                if ((speed < 0 && position[axis] < bounds.min[axis]) ||
+                    (speed > 0 && position[axis] > bounds.max[axis])) {
+                  
+                  scene.removeEntity(car);
+                  delete car;
+                }
+              };
+
+              return self;
+            }) (car));
+
+            scene.addEntity(car);
+          }
+        };
+      }
+
+      o = Generator(createCarGenerator('x', -1.2, 3, 0.6, 0.25), 3.0, 6.0, {
         transform: {
           options: {
             position: {
-              x: 1.8, y: 0.0, z: -0.8
-            },
-            scale: {
-              x: 0.07, y: 0.07, z: 0.07
+              x: 2, y: 0.0, z: -0.8
             },
           }
         }
       });
       scene.addEntity(o);
 
-      var o = Car(carMesh.dGUID, -0.5, {
+      o = Generator(createCarGenerator('x', -1, 1, 0.6, 0.25), 2.0, 3.5, {
         transform: {
           options: {
             position: {
-              x: 1.8, y: 0.0, z: -0.4
-            },
-            scale: {
-              x: 0.07, y: 0.07, z: 0.07
+              x: 2, y: 0.0, z: -1.8 
             },
           }
         }
       });
       scene.addEntity(o);
 
-      o = Log(logMesh.dGUID, 0.5, {
-        textureUrl: 'img/w3.jpg',
+      o = Generator(createCarGenerator('x', 1.3, 3, 0.6, 0.25), 3.0, 5.0, {
         transform: {
           options: {
             position: {
-              x: -1.0, y: 0.05, z: 1.2
-            },
-            scale: {
-              x: 0.07, y: 0.21, z: 0.07
+              x: -2, y: 0.0, z: -0.5
             },
           }
         }
       });
       scene.addEntity(o);
 
-      // Player and Camera objects
+      o = Generator(createCarGenerator('x', 1.1, 2, 0.6, 0.25), 2.5, 4.5, {
+        transform: {
+          options: {
+            position: {
+              x: -2, y: 0.0, z: -1.2
+            },
+          }
+        }
+      });
+      scene.addEntity(o);
+
+      // LOG GENERATORS
+      function createLogGenerator(axis, speed, trunkSize, maxSize, minSize) {
+        var sign = speed < 0 ? -1 : 1;
+        maxSize = maxSize || 3;
+        minSize = minSize || 3;
+        trunkSize = trunkSize || 0;
+        return function (transform) {
+          var size = Math.random() * (maxSize - minSize) + minSize;
+          var generatorPos = transform.getPosition();
+          var trunkPos = {
+            x: generatorPos.x, y: generatorPos.y, z: generatorPos.z
+          };
+          trunkPos[axis] -= sign * trunkSize * size;
+          var log = Log(axis, logMesh.dGUID, speed, {
+            // textureUrl: 'img/w3.jpg',
+            transform: {
+              options: {
+                position: trunkPos,
+                scale: {
+                  x: trunkSize, y: trunkSize * size, z: trunkSize
+                },
+              }
+            }
+          });
+          trunkPos[axis] -= sign * trunkSize;
+
+          var bounds = ground.getWorldBounds();
+
+          // make car destroy itself after it crosses the opposite bounds
+          log.addUpdatable((function(log) {
+            var self = dali.Updatable();
+
+            self.update = function(dt) {
+              var position = log.transform.getPosition();
+              if ((speed < 0 && position[axis] < bounds.min[axis]) ||
+                  (speed > 0 && position[axis] > bounds.max[axis])) {
+                
+                scene.removeEntity(log);
+                delete log;
+              }
+            };
+
+            return self;
+          }) (log));
+
+          scene.addEntity(log);
+        };
+      }
+
+      o = Generator(createLogGenerator('x', 0.9, 0.07, 4), 2.7, 4.3, {
+        transform: {
+          options: {
+            position: {
+              x: -2, y: 0.0, z: 0.3
+            },
+          }
+        }
+      });
+      scene.addEntity(o);
+
+      o = Generator(createLogGenerator('x', -1.2, 0.07, 3, 2), 2, 3, {
+        transform: {
+          options: {
+            position: {
+              x: 2, y: 0.0, z: 0.6
+            },
+          }
+        }
+      });
+      scene.addEntity(o);
+
+      o = Generator(createLogGenerator('x', 1.3, 0.07, 2, 2), 1.7, 2.5, {
+        transform: {
+          options: {
+            position: {
+              x: -2, y: 0.0, z: 1.0
+            },
+          }
+        }
+      });
+      scene.addEntity(o);
+
+      o = Generator(createLogGenerator('x', -1.5, 0.07, 2, 1), 1.2, 2.0, {
+        transform: {
+          options: {
+            position: {
+              x: 2, y: 0.0, z: 1.4
+            },
+          }
+        }
+      });
+      scene.addEntity(o);
+
+      // PLAYER AND FROG
 
       // Setup follow camera to look at frog
       var cameraPosition = {
-        x: 0.0, y: 1.0, z: -1.4,
+        x: 0.0, y: 1.5, z: -2.0,
       };
       var at = vec3.fromValues(-cameraPosition.x,
                                -cameraPosition.y,
@@ -566,7 +753,7 @@ function main() {
         transform: {
           options: {
             position: {
-              x: 0.0, y: 0.0, z: -1.5,
+              x: 0.0, y: 0.0, z: -2.0,
             },
             scale: {
               x: 1.0, y: 1.0, z: 1.0
@@ -590,6 +777,8 @@ function main() {
         }
       });
       scene.addEntity(frog);
+
+      // CAMERAS
 
       var cameraFollow = dali.graphx.g3D.PerspectiveCamera({
         transform: {

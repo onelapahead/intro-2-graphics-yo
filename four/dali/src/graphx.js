@@ -1,4 +1,18 @@
 
+// TODO
+// ----------------------------------
+// Parsing .mtl files
+// Bump mapping
+// Directional lights
+// UI/2D shaders and objects
+// Text
+// Light octree per object
+// Some priority queues
+// Translucent objects
+// BSP for transparent objects?
+// Mesh boundaries and correcting mesh centers
+
+
 // Rendering engine and interface
 // helpful source: http://webglfundamentals.org/webgl/lessons/webgl-boilerplate.html
 (function () {
