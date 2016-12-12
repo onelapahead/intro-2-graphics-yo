@@ -51,6 +51,8 @@
   var shaders = window.dali.ObjectManager('shaderprogram');
   var shader3d;
 
+  graphx.g3D._getDefaultShader = function() { return shader3d; };
+
   // prereq: load, addProgram
   graphx.init = function() {
     if (shader3d == null) {
@@ -825,6 +827,8 @@
       options.rotation = rot;
     }
 
+    options.skinDepth = options.skinDepth || vec3.fromValues(1.0, 1.0, 1.0);
+
     // TODO get center from init AABB
     mat4.fromRotationTranslationScaleOrigin(
       transform, 
@@ -834,24 +838,26 @@
       vec3.fromValues(0, 0, 0) // TODO change to position?
     );
 
-    self.getTransform = function() {
+    self.getTransform = function(print) {
       var _transform = eTransform.toMatrix();
-      mat4.multiply(_transform, transform, _transform);
-      return _transform;
+      mat4.multiply(_transform, _transform, transform);
+      return eTransform.toMatrix(print);
     };
 
     // HACK: ASSUME MESH IS WITH DEFAULT SHADER
     // TODO fix this when decoupling mesh from shader
     var AABB, AABS;
     var mesh = shader3d._getMesh(self.meshId);
-    var t = self.getTransform();
+    var t = self.getTransform(options.print);
 
-    AABB = mesh.getUpdatedAABB(t);
-    AABS = mesh.getUpdatedAABS(t);
+    AABB = mesh.getUpdatedAABB(t, options.skinDepth, options.print);
+    AABS = mesh.getUpdatedAABS(t, options.skinDepth, options.print);
     // AABB = mesh.getUpdatedAABB(transform);
     // AABS = mesh.getUpdatedAABS(transform);
-    // console.log('Bounding box for mesh: ' + self.meshId);
-    // console.log(AABB);
+    if (options.print) {
+      console.log('Bounding box for mesh: ' + self.meshId);
+      console.log(AABB);
+    }
 
     mesh = null;
     delete t;
@@ -939,7 +945,9 @@
     //   // TODO error check
     //   AABS = _AABS;
     // };
-
+    var possible;
+    if (options != null)
+      possible = options.url;
     // O(n)
     var initAABB = function() {
       // TODO if mesh isnt centered,
@@ -955,16 +963,17 @@
         vertexList.push(temp);
       }
       AABB = calculateAABB(vertexList);
+      console.log(possible);
       console.log(AABB);
     };
 
     function calculateAABB(data) {
       var out = {
-        min: vec3.fromValues(Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE),
-        max: vec3.fromValues(Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE)
+        min: vec3.fromValues(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY),
+        max: vec3.fromValues(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY)
       };
 
-      for (var i = 0; i < data.length; i += 3) {
+      for (var i = 0; i < data.length; i++) {
         var vertex = data[i];
         for (var o = 0; o < 3; o++) {
           if (vertex[o] < out.min[o])
@@ -978,27 +987,36 @@
     }
 
     // O(1) - update
-    self.getUpdatedAABB = function(transform) {
+    self.getUpdatedAABB = function(transform, skinDepth, print) {
       // TODO Use transform to rotate oAABB
       // determine AABB from 8-vertices of
       // rotated oAABB
+      var scale = mat4.create();
+      mat4.fromScaling(scale, skinDepth);
       var box = [];
       var min = AABB.min;
       var max = AABB.max;
-      box[0] = vec3.fromValues(min[0], min[1], min[2]);
-      box[1] = vec3.fromValues(max[0], min[1], min[2]);
-      box[2] = vec3.fromValues(max[0], min[1], max[2]);
-      box[3] = vec3.fromValues(min[0], min[1], max[2]);
-      box[4] = vec3.fromValues(min[0], max[1], min[2]);
-      box[5] = vec3.fromValues(max[0], max[1], min[2]);
-      box[6] = vec3.fromValues(max[0], max[1], max[2]);
-      box[7] = vec3.fromValues(min[0], max[1], max[2]);
+      box.push(vec3.fromValues(min[0], min[1], min[2]))
+      box.push(vec3.fromValues(max[0], min[1], min[2]));
+      box.push(vec3.fromValues(max[0], min[1], max[2]));
+      box.push(vec3.fromValues(min[0], min[1], max[2]));
+      box.push(vec3.fromValues(min[0], max[1], min[2]));
+      box.push(vec3.fromValues(max[0], max[1], min[2]));
+      box.push(vec3.fromValues(max[0], max[1], max[2]));
+      box.push(vec3.fromValues(min[0], max[1], max[2]));
 
-      for (var i = 0; i < 8; i++) {
+      mat4.multiply(transform, transform, scale);
+      for (var i = 0; i < box.length; i++) {
         vec3.transformMat4(box[i], box[i], transform);
+        if (print) {
+          console.log('i: ' + i);
+          console.log(box[i]);
+        }
       }
 
       box = calculateAABB(box);
+      if (print)
+        console.log(box);
       box.center = vec3.create();
       vec3.add(box.center, box.min, box.max);
       vec3.scale(box.center, box.center, 0.5);
@@ -1257,7 +1275,7 @@
   var WHITESPACE_RE = /\s+/;
   // TRIMESH
   graphx.g3D.TriMesh = function(options, base) {
-    var self = graphx.g3D.Mesh(base);
+    var self = graphx.g3D.Mesh(options, base);
     self.setType('trimesh');
 
     if (options == null || options.url == null || !window.dali.isString(options.url))

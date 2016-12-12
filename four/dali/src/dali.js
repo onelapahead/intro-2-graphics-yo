@@ -28,6 +28,12 @@ var dali = {
     return obj != null && obj.dGUID != null && obj.getType != null && obj.inherit != null && daliReg.test(obj.inherit);
   };
 
+  window.dali.printCallStack = function() {
+    var stack = new Error().stack;
+    console.log("PRINTING CALL STACK");
+    console.log( stack );
+  };
+
   // GUID GENERATOR
   var counter = 0;
   const N = 9;
@@ -392,7 +398,13 @@ dali.EntityTransform = function (options, base, parent) {
   set(options);
 
   // TODO add frame caching for matrix transform isn't recalculated
-  self.toMatrix = function() {
+  self.toMatrix = function(print) {
+    if (print) {
+      console.log(rotation.quat());
+      console.log(position.vec3());
+      console.log(scale.vec3());
+    }
+
     var t = mat4.create();
     mat4.fromRotationTranslationScaleOrigin(
       t, 

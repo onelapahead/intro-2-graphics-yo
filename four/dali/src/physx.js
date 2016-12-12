@@ -4,6 +4,7 @@
 
   var physx = dali.physx;
   var world, ground, groundMaterial;
+  var boxMesh, boxTexture, boxMaterial;
   physx.init = function() {
     world = new CANNON.World();
     world.broadphase = new CANNON.NaiveBroadphase();
@@ -11,17 +12,33 @@
     var groundPlane = new CANNON.Plane();
     groundMaterial = physx.PMaterial();
     ground = new CANNON.Body({ position: new CANNON.Vec3(), mass: 0, shape: groundPlane, material: groundMaterial.mat });
+    ground.boundingSphereRadius = 1000;
     ground.quaternion.setFromVectors(
       new CANNON.Vec3(0, 0, 1),
       new CANNON.Vec3(0, 1, 0)
     );
 
     world.addBody(ground);
+
+    boxMesh = window.dali.graphx.g3D.BoxMesh({
+        // width: 6,
+        // height: 2,
+        // depth: 2
+        width: 1,
+        height: 1,
+        depth: 1
+        
+      });
+    window.dali.graphx.g3D._getDefaultShader().addMesh(boxMesh);
+    boxTexture = window.dali.graphx.g3D.Texture({
+      r: 200, g: 100, b: 100, a: 255
+    });
+    boxMaterial = window.dali.graphx.GMaterial();
   };
 
   physx.update = function(dt) {
     getTransforms();
-
+    // world.broadphase.useBoundingBoxes = true;
     world.step(dt);
 
     setTransforms();
@@ -89,12 +106,47 @@
      *
      *
      */
-    var shape;
+    var shape, aabb;
     if (options.collider != null && options.model != null) {
-      shape = options.collider.initShape(options.model);
+      var o = options.collider.initShape(options.model);
+      shape = o.shape;
+      aabb = o.aabb;
     } else if (options.shape != null) {
       shape = options.shape;
     } else throw 'No shape information given for EntityBody';
+
+    if (options.print) {
+      console.log(shape);
+    }
+
+    // var pos = entity.transform.getPosition();
+    // pos.x = aabb.center[0];
+    // pos.y = aabb.center[1];
+    // pos.z = aabb.center[2];
+
+    // vec3.sub(offset, offset, aabb.center);
+
+    // if (options.print && aabb != null) {
+    //   var model = window.dali.graphx.g3D.Model({
+    //     meshId: boxMesh.dGUID,
+    //     eTransform: window.dali.EntityTransform({
+    //       position: {
+    //         x: aabb.center[0], y: aabb.center[1], z: aabb.center[2] 
+    //       },
+    //       scale: {
+    //         x: aabb.max[0] - aabb.min[0], y: aabb.max[1] - aabb.min[1], z: aabb.max[2] - aabb.min[2],
+    //       },
+    //     }),
+    //   });
+
+    //   var renderer = dali.graphx.g3D.Renderable3D({
+    //     'material': boxMaterial,
+    //     'texture': boxTexture,
+    //     'model': model
+    //   });
+
+    //   entity.addRenderable(renderer);
+    // }
 
     // Init cannon body with shape and entity positon
     var initPos = new CANNON.Vec3();
@@ -102,7 +154,7 @@
     var eTransform = entity.transform;
 
     initPos.copy(eTransform.getPosition());
-    initRot.copy(eTransform.getRotation())
+    initRot.copy(eTransform.getRotation());
 
     self.transform = new CANNON.Body({
       position: initPos,
@@ -119,10 +171,12 @@
 
     self.getEntityTransform = function() {
       self.transform.position.copy(eTransform.getPosition());
+      // self.transform.quaternion.copy(eTransform.getRotation());
     };
 
     self.setEntityTransform = function() {
       eTransform.getPosition().copy(self.transform.position);
+      // eTransform.getRotation().copy(self.transform.quaternion);
       if (options.print) {
         // console.log('Body: ' + self.transform.position);
         // console.log('Entity: ' + eTransform.getPosition());
@@ -168,7 +222,10 @@
         (modelAABB.max[2] - modelAABB.min[2]) / 2
       );
 
-      return new CANNON.Box(half);
+      return {
+        shape: new CANNON.Box(half),
+        aabb: modelAABB,
+      };
     };
 
     return self;

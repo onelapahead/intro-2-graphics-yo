@@ -154,6 +154,7 @@ function GroundTile(textureUrl, meshId, options) {
   var model = dali.graphx.g3D.Model({
     meshId: meshId,
     eTransform: self.transform,
+    skinDepth: vec3.fromValues(1.0, 1.0, 1.0),
   });
 
   var renderer = dali.graphx.g3D.Renderable3D({
@@ -179,95 +180,10 @@ function GroundTile(textureUrl, meshId, options) {
   return self;
 }
 
-// function Player(options) {
-//   var self = dali.Entity(options);
-
-//   var pos = self.transform.getPosition();
-//   ground.snap(pos);
-//   var pair = ground.quantize(pos.x, pos.z);
-//   var i = pair[0], j = pair[1];
-//   delete pair;
-//   pos = null;
-//   delete pos;
-
-//   self.enabled = false;
-
-//   var groundMax = ground.getGridBounds().max;
-//   var keyMap = new Map();
-
-//   var keys = [
-//     'KeyW',
-//     'KeyA',
-//     'KeyS',
-//     'KeyD'
-//   ];
-
-//   function updateIJ() {
-//     var position = self.transform.getPosition();
-//     var pair = ground.quantize(position.x, position.z);
-//     i = pair[0], j = pair[1];
-//     position = null;
-//     delete position;
-//     delete pair;
-//   }
-
-//   function updatePosition() {
-//     console.log('i: ' + i + ', j: ' + j);
-//     var coords = ground.localize(i, j);
-//     var position = self.transform.getPosition();
-//     position.x = coords[0];
-//     position.z = coords[2];
-//     position = null;
-//     delete position;
-//     delete coords;
-//   }
-
-//   for (var ki = 0; ki < keys.length; ki++) {
-//     keyMap.set(keys[ki], false);
-//   }
-
-//   var keyCode;
-//   function handlePressDown(code) {
-//     if (code == 'KeyW' && j < groundMax.j - 1) {
-//       j += 1;
-//     } else if (code == 'KeyA' && i > 0) {
-//       i -= 1;
-//     } else if (code == 'KeyS' && j > 0) {
-//       j -= 1;
-//     } else if (code == 'KeyD' && i < groundMax.i - 1) {
-//       i += 1;
-//     } else return ;
-//     updatePosition();
-//   }
-
-//   self.addEventListener('keydown', function(event) {
-//     if (keyMap.has(event.code) && !keyMap.get(event.code)) {
-//       keyMap.set(event.code, true);
-//       if (!dali.pause)
-//         keyCode = event.code;
-//     }
-//   });
-
-//   self.addEventListener('keyup', function(event) {
-//     if (keyMap.has(event.code) && keyMap.get(event.code)) {
-//       keyMap.set(event.code, false);
-//     }
-//   });
-
-//   self.update = function(dt) {
-//     if (keyCode != null && self.enabled) {
-//       handlePressDown(keyCode);
-//     }
-//     keyCode = null;
-//   };
-
-//   return self;
-// }
-
 const GRAVITY = -15.0;
 const GROUND_HEIGHT = -0.1;
-const JUMP_TIME = 0.48;
-const JUMP_HEIGHT = 0.6;
+const JUMP_TIME = 0.5;
+const JUMP_HEIGHT = 0.7;
 
 function Frog(textureUrl, meshId, options) {
   var self = dali.Entity(options);
@@ -280,6 +196,8 @@ function Frog(textureUrl, meshId, options) {
   var model = dali.graphx.g3D.Model({
     meshId: meshId,
     eTransform: self.transform,
+    skinDepth: vec3.fromValues(0.8, 0.8, 0.4),
+    // print: true,
   });
 
   var renderer = dali.graphx.g3D.Renderable3D({
@@ -369,10 +287,13 @@ function Frog(textureUrl, meshId, options) {
       } else return ;
 
       if (axis != null && next != null) {
+        updateIJ();
         var jumpImpulse = jump(axis, next);
         var entityPos = self.transform.getPosition();
         entityPos.y += 0.01;
         body.transform.applyImpulse(jumpImpulse, entityPos);
+        axis = (axis === 'x') ? 'z' : 'x';
+        body.transform.velocity[axis] = 0.0;
         self.jumping = true;
         timeAtJump = performance.now();
       }
@@ -457,6 +378,8 @@ function Frog(textureUrl, meshId, options) {
     if (self.jumping && (performance.now() - timeAtJump) / 1000 >= JUMP_TIME) {
       // console.log(body.transform.velocity);
       self.jumping = false;
+      updateIJ();
+      updatePosition();
     }
   };
 
@@ -485,6 +408,7 @@ function Generator(generate, timeLow, timeHigh, options) {
   return self;
 }
 
+var carCount = 0;
 function Mover(axis, meshId, _speed, options) {
   var self = dali.Entity(options);
 
@@ -503,6 +427,7 @@ function Mover(axis, meshId, _speed, options) {
   var model = dali.graphx.g3D.Model({
     meshId: meshId,
     eTransform: self.transform,
+    skinDepth: options.skinDepth,
   });
 
   options = options || {};
@@ -514,17 +439,33 @@ function Mover(axis, meshId, _speed, options) {
 
   self.addRenderable(renderer);
 
-  var updater = (function() {
-    var _self = dali.Updatable();
+  var vel = new CANNON.Vec3();
+  vel[axis] = _speed;
+  var collider = dali.physx.BoxCollider();
+  var body = dali.physx.EntityBody(self, {
+    initVel: vel,
+    material: defaultPhysicsMaterial,
+    mass: 0,
+    // print: carCount == 0,
+    print: true,
+    type: CANNON.Body.KINEMATIC,
+    model: model,
+    collider: collider,
+  });
 
-    _self.update = function(dt) {
-      var pos = self.transform.getPosition();
-      pos[axis] += dt * speed;
-    };
+  self.getBody = function() { return body; };
 
-    return _self;
-  }) ();
-  self.addUpdatable(updater);
+  // var updater = (function() {
+  //   var _self = dali.Updatable();
+
+  //   _self.update = function(dt) {
+  //     var pos = self.transform.getPosition();
+  //     pos[axis] += dt * speed;
+  //   };
+
+  //   return _self;
+  // }) ();
+  // self.addUpdatable(updater);
   return self;
 }
 
@@ -539,6 +480,7 @@ function Log(axis, meshId, _speed, options) {
     z: dir * 90,
     x: 90
   };
+  options.skinDepth = vec3.fromValues(0.2, 0.9, 0.6);
   options.textureCreater = function() {
     return dali.graphx.g3D.Texture({
       r: 195, g: 131, b: 76, a: 255
@@ -547,6 +489,11 @@ function Log(axis, meshId, _speed, options) {
 
   var self = Mover(axis, meshId, _speed, options);
   self.setType('log');
+
+  var vel = new CANNON.Vec3();
+  vel[axis] = _speed;
+
+  // self.getBody().transform.collisionResponse = false;
 
   return self;
 }
@@ -559,9 +506,14 @@ function Car(axis, meshId, _speed, options) {
   options.transform.options.axes = {
     y: sign * 90,
   };
+  options.skinDepth = vec3.fromValues(0.9, 0.8, 0.8);
 
   var self = Mover(axis, meshId, _speed, options);
   self.setType('car');
+  var collider = dali.physx.BoxCollider();
+
+  self.getBody().transform.collisionResponse = false;
+
   return self;
 }
 
@@ -635,19 +587,6 @@ function main() {
   // loads WebGL
   dali.graphx.load();
 
-  // init's Cannon world
-  dali.physx.init();
-  dali.physx.setGravity({
-    x: 0.0, y: GRAVITY, z:0
-  });
-  dali.physx.defineMaterialContact(defaultPhysicsMaterial, defaultPhysicsMaterial, {
-    friction: 1.0, restitution: 0.0
-  });
-  dali.physx.defineGroundContact(defaultPhysicsMaterial, {
-    friction: 0.1, restitution: 0.0
-  });
-  dali.physx.setGroundHeight(GROUND_HEIGHT);
-
   var shader = dali.graphx.g3D.ShaderProgram3D({
     default: true,
     fShader: dali.graphx.Shader({
@@ -688,6 +627,19 @@ function main() {
     specular: [0.3, 0.3, 0.3],
   });
   scene.addEntity(light);
+
+  // init's Cannon world
+  dali.physx.init();
+  dali.physx.setGravity({
+    x: 0.0, y: GRAVITY, z:0
+  });
+  dali.physx.defineMaterialContact(defaultPhysicsMaterial, defaultPhysicsMaterial, {
+    friction: 0.1, restitution: 0.0
+  });
+  dali.physx.defineGroundContact(defaultPhysicsMaterial, {
+    friction: 1000.0, restitution: 0.0
+  });
+  dali.physx.setGroundHeight(GROUND_HEIGHT);
 
   // load images, json, audio, etc.
     // add scene objects
@@ -794,6 +746,7 @@ function main() {
             }) (car));
 
             scene.addEntity(car);
+            carCount++;
           }
         };
       }
