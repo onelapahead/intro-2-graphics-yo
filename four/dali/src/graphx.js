@@ -102,7 +102,7 @@
     var self = {};
 
     function setColor(array, field) {
-      if (!window.dali.isString(field)) throw 'Invalid key for setField in Material';
+      if (!window.dali.isString(field)) throw 'Invalid key for setField in GMaterial';
       if (!window.dali.isNumber(array[0]) || !window.dali.isNumber(array[1]) || !window.dali.isNumber(array[2]))
         throw 'Invalid type for element in array: ' + array;
       // TODO check values
@@ -133,7 +133,7 @@
   };
 
   const DEFAULT_MATERIAL_SHININESS = 20.0;
-  graphx.Material = function(options, base) {
+  graphx.GMaterial = function(options, base) {
     var self = window.dali.Object(graphx.Color(options));
     self.setType('material');
 
@@ -477,6 +477,8 @@
       meshMap.set(mesh.dGUID, mesh);
     };
 
+    self._getMesh = function(id) { return meshMap.get(id); };
+
     self.requestRender = function(options) {
       if (options == null || options.isOpaque == null || options.meshId == null || options.request == null)
         throw 'Invalid render request options: ' + options;
@@ -762,7 +764,7 @@
 
     if (window.dali.isDaliObj(options.material) && options.material.isType('material'))
       material = options.material;
-    else material = graphx.Material(); // default material
+    else material = graphx.GMaterial(); // default material
 
     if (shaders.hasObj(options.shaderGuid))
       shaderGuid = options.shaderGuid;
@@ -780,6 +782,10 @@
         },
       };
       requestRender(opts, shaderGuid);
+    };
+
+    self.setMaterial = function(_material) {
+      material = _material;
     };
 
     return self;
@@ -829,10 +835,35 @@
     );
 
     self.getTransform = function() {
-      var parent = eTransform.toMatrix();
-      mat4.multiply(parent, transform, parent);
-      return parent;
+      var _transform = eTransform.toMatrix();
+      mat4.multiply(_transform, transform, _transform);
+      return _transform;
     };
+
+    // HACK: ASSUME MESH IS WITH DEFAULT SHADER
+    // TODO fix this when decoupling mesh from shader
+    var AABB, AABS;
+    var mesh = shader3d._getMesh(self.meshId);
+    var t = self.getTransform();
+
+    AABB = mesh.getUpdatedAABB(t);
+    AABS = mesh.getUpdatedAABS(t);
+    // AABB = mesh.getUpdatedAABB(transform);
+    // AABS = mesh.getUpdatedAABS(transform);
+    // console.log('Bounding box for mesh: ' + self.meshId);
+    // console.log(AABB);
+
+    mesh = null;
+    delete t;
+    delete mesh;
+
+    self.getAABB = function() {
+      return AABB;
+    };
+
+     self.getAABS = function() {
+      return AABS;
+     };
 
     return self;
   };
@@ -855,6 +886,9 @@
     self.initBuffers = function() {
       triangles = self.triangleData();
       createBufferInfo();
+
+      initAABB();
+      initAABS();
     };
 
     function createBufferInfo() {
@@ -896,61 +930,90 @@
     // n - number of vertices
     var AABB, AABS;
 
-    self.setAABB = function(_AABB) {
-      // TODO error check
-      oAABB = _AABB;
-    };
+    // self.setAABB = function(_AABB) {
+    //   // TODO error check
+    //   oAABB = _AABB;
+    // };
 
-    self.setAABS = function(_AABS) {
-      // TODO error check
-      AABS = _AABS;
-    };
+    // self.setAABS = function(_AABS) {
+    //   // TODO error check
+    //   AABS = _AABS;
+    // };
 
     // O(n)
-    self.initAABB = function() {
+    var initAABB = function() {
       // TODO if mesh isnt centered,
       // generate translation matrix for Model
-      oAABB = {
+
+      var vertices = triangles.aVertexPosition.data;
+      var vertexList = [];
+      for (var i = 0; i < vertices.length; i += 3) {
+        var temp = [];
+        for (var o = 0; o < 3; o++) {
+          temp.push(vertices[i + o]);
+        }
+        vertexList.push(temp);
+      }
+      AABB = calculateAABB(vertexList);
+      console.log(AABB);
+    };
+
+    function calculateAABB(data) {
+      var out = {
         min: vec3.fromValues(Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE),
         max: vec3.fromValues(Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE)
       };
 
-      var vertices = triangles.aVertexPosition.data;
-      for (var i = 0; i < vertices.length; i += 3) {
+      for (var i = 0; i < data.length; i += 3) {
+        var vertex = data[i];
         for (var o = 0; o < 3; o++) {
-          if (vertices[i + o] < oAABB.min[o])
-            oAABB.min[o] = vertices[i+o];
-          if (vertices[i + o] > oAABB.max[o])
-            oAABB.max[o] = vertices[i+o];
+          if (vertex[o] < out.min[o])
+            out.min[o] = vertex[o];
+          if (vertex[o] > out.max[o])
+            out.max[o] = vertex[o];
         }
       }
 
-      console.log(oAABB);
-    };
+      return out;
+    }
 
     // O(1) - update
-    self.updateAABB = function() {
+    self.getUpdatedAABB = function(transform) {
       // TODO Use transform to rotate oAABB
       // determine AABB from 8-vertices of
       // rotated oAABB
-    };
+      var box = [];
+      var min = AABB.min;
+      var max = AABB.max;
+      box[0] = vec3.fromValues(min[0], min[1], min[2]);
+      box[1] = vec3.fromValues(max[0], min[1], min[2]);
+      box[2] = vec3.fromValues(max[0], min[1], max[2]);
+      box[3] = vec3.fromValues(min[0], min[1], max[2]);
+      box[4] = vec3.fromValues(min[0], max[1], min[2]);
+      box[5] = vec3.fromValues(max[0], max[1], min[2]);
+      box[6] = vec3.fromValues(max[0], max[1], max[2]);
+      box[7] = vec3.fromValues(min[0], max[1], max[2]);
 
-    self.getAABB = function() {
-      return AABB;
-    };
+      for (var i = 0; i < 8; i++) {
+        vec3.transformMat4(box[i], box[i], transform);
+      }
 
-    // O(1)
-    function rotatedToAABB(box){
-      // TODO
-    }
+      box = calculateAABB(box);
+      box.center = vec3.create();
+      vec3.add(box.center, box.min, box.max);
+      vec3.scale(box.center, box.center, 0.5);
+      return box;
+    };
 
     // O(n)
-    self.initAABS = function() {
+    var initAABS = function() {
       // TODO vertex scan of largest distance
     };
 
     // O(1) - doesn't require updating, its a sphere
-    self.getAABS = function() { return AABS; };
+    self.getUpdatedAABS = function(transform) { 
+      // TODO
+    };
 
     return self;
   };

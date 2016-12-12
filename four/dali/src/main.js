@@ -1,5 +1,5 @@
-
-var defaultMaterial = dali.graphx.Material({
+// GameObjects, Materials, and Resources
+var defaultMaterial = dali.graphx.GMaterial({
   ambient: [0.1, 0.1, 0.1],
   diffuse: [1.0, 1.0, 1.0],
   specular: [0.8, 0.8, 0.8],
@@ -7,7 +7,7 @@ var defaultMaterial = dali.graphx.Material({
   shininess: 32.0,
 });
 
-var frogMaterial = dali.graphx.Material({
+var frogMaterial = dali.graphx.GMaterial({
   ambient: [0.1, 0.3, 0.1],
   diffuse: [0.2, 1.0, 0.2],
   specular: [0.6, 0.8, 0.6],
@@ -15,7 +15,7 @@ var frogMaterial = dali.graphx.Material({
   shininess: 64.0,
 });
 
-var treeMaterial = dali.graphx.Material({
+var treeMaterial = dali.graphx.GMaterial({
   ambient: [0.6, 0.6, 0.6],
   diffuse: [1.0, 1.0, 1.0],
   specular: [0.3, 0.3, 0.3],
@@ -89,7 +89,8 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
   /**
    * Grid consists of "sections", a group of consecutive
    * rows of the same texture and collision action.
-   * Sections are defined using their lower z-bound, 
+   * Sections are defined using their lower z-bound,
+   * TODO add box colliders for sections
    */
   var section = sections[0];
   var secPtr = 0, texture;
@@ -111,7 +112,7 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
           options: {
             position: {
               x: ll.x + i * step + step/2,
-              y: -0.05,
+              y: -0.1,
               z: ll.z + j * step + step/2,
             },
             scale: {
@@ -165,11 +166,139 @@ function GroundTile(textureUrl, meshId, options) {
 
   self.addRenderable(renderer);
 
+  var collider = dali.physx.BoxCollider();
+  var body = dali.physx.EntityBody(self, {
+    material: defaultPhysicsMaterial,
+    mass: 0,
+    type: CANNON.Body.STATIC,
+    model: model,
+    collider: collider,
+  });
+  body.transform.collisionResponse = false;
+
   return self;
 }
 
-function Player(options) {
+// function Player(options) {
+//   var self = dali.Entity(options);
+
+//   var pos = self.transform.getPosition();
+//   ground.snap(pos);
+//   var pair = ground.quantize(pos.x, pos.z);
+//   var i = pair[0], j = pair[1];
+//   delete pair;
+//   pos = null;
+//   delete pos;
+
+//   self.enabled = false;
+
+//   var groundMax = ground.getGridBounds().max;
+//   var keyMap = new Map();
+
+//   var keys = [
+//     'KeyW',
+//     'KeyA',
+//     'KeyS',
+//     'KeyD'
+//   ];
+
+//   function updateIJ() {
+//     var position = self.transform.getPosition();
+//     var pair = ground.quantize(position.x, position.z);
+//     i = pair[0], j = pair[1];
+//     position = null;
+//     delete position;
+//     delete pair;
+//   }
+
+//   function updatePosition() {
+//     console.log('i: ' + i + ', j: ' + j);
+//     var coords = ground.localize(i, j);
+//     var position = self.transform.getPosition();
+//     position.x = coords[0];
+//     position.z = coords[2];
+//     position = null;
+//     delete position;
+//     delete coords;
+//   }
+
+//   for (var ki = 0; ki < keys.length; ki++) {
+//     keyMap.set(keys[ki], false);
+//   }
+
+//   var keyCode;
+//   function handlePressDown(code) {
+//     if (code == 'KeyW' && j < groundMax.j - 1) {
+//       j += 1;
+//     } else if (code == 'KeyA' && i > 0) {
+//       i -= 1;
+//     } else if (code == 'KeyS' && j > 0) {
+//       j -= 1;
+//     } else if (code == 'KeyD' && i < groundMax.i - 1) {
+//       i += 1;
+//     } else return ;
+//     updatePosition();
+//   }
+
+//   self.addEventListener('keydown', function(event) {
+//     if (keyMap.has(event.code) && !keyMap.get(event.code)) {
+//       keyMap.set(event.code, true);
+//       if (!dali.pause)
+//         keyCode = event.code;
+//     }
+//   });
+
+//   self.addEventListener('keyup', function(event) {
+//     if (keyMap.has(event.code) && keyMap.get(event.code)) {
+//       keyMap.set(event.code, false);
+//     }
+//   });
+
+//   self.update = function(dt) {
+//     if (keyCode != null && self.enabled) {
+//       handlePressDown(keyCode);
+//     }
+//     keyCode = null;
+//   };
+
+//   return self;
+// }
+
+const GRAVITY = -15.0;
+const GROUND_HEIGHT = -0.1;
+const JUMP_TIME = 1.2;
+const JUMP_HEIGHT = 1.5;
+
+function Frog(textureUrl, meshId, options) {
   var self = dali.Entity(options);
+
+  var mat = frogMaterial;
+  // var texture = dali.graphx.g3D.Texture({
+  //   url: textureUrl
+  // });
+  var texture = defaultMaterial;
+  var model = dali.graphx.g3D.Model({
+    meshId: meshId,
+    eTransform: self.transform,
+  });
+
+  var renderer = dali.graphx.g3D.Renderable3D({
+    'material': mat,
+    'texture': texture,
+    'model': model
+  });
+
+  self.addRenderable(renderer);
+
+  var collider = dali.physx.BoxCollider();
+  var body = dali.physx.EntityBody(self, {
+    material: defaultPhysicsMaterial,
+    initVel: new CANNON.Vec3(0, 0, 0),
+    print: true,
+    mass: 1,
+    model: model,
+    collider: collider,
+  });
 
   var pos = self.transform.getPosition();
   ground.snap(pos);
@@ -179,7 +308,10 @@ function Player(options) {
   pos = null;
   delete pos;
 
- var groundMax = ground.getGridBounds().max;
+  self.enabled = false;
+  self.jumping = false;
+
+  var groundMax = ground.getGridBounds().max;
   var keyMap = new Map();
 
   var keys = [
@@ -215,23 +347,39 @@ function Player(options) {
 
   var keyCode;
   function handlePressDown(code) {
-    if (code == 'KeyW' && j < groundMax.j - 1) {
-      j += 1;
-    } else if (code == 'KeyA' && i > 0) {
-      i -= 1;
-    } else if (code == 'KeyS' && j > 0) {
-      j -= 1;
-    } else if (code == 'KeyD' && i < groundMax.i - 1) {
-      i += 1;
-    } else return ;
-    updatePosition();
+    if (!self.jumping) {
+
+    }
+
+    console.log('JUMP');
+    body.transform.applyImpulse(new CANNON.Vec3(0, 3, 12), self.transform.getPosition());
+
+    // if (code == 'KeyW' && j < groundMax.j - 1) {
+    //   j += 1;
+    // } else if (code == 'KeyA' && i > 0) {
+    //   i -= 1;
+    // } else if (code == 'KeyS' && j > 0) {
+    //   j -= 1;
+    // } else if (code == 'KeyD' && i < groundMax.i - 1) {
+    //   i += 1;
+    // } else return ;
+    // updatePosition();
   }
+
+  function jump(axis, nextSqaure, )
+
+  // body.transform.addEventListener('collide', function(event) {
+  //   if (!event.body.collisionResponse || !event.target.body.collisionResponse)
+  //     console.log(event);
+  //   console.log('Hitting stuff!');
+  // });
 
   self.addEventListener('keydown', function(event) {
     if (keyMap.has(event.code) && !keyMap.get(event.code)) {
       keyMap.set(event.code, true);
-      if (!dali.pause)
+      if (!dali.pause) {
         keyCode = event.code;
+      }
     }
   });
 
@@ -242,42 +390,15 @@ function Player(options) {
   });
 
   self.update = function(dt) {
-    if (keyCode != null) {
+    if (keyCode != null && self.enabled) {
       handlePressDown(keyCode);
     }
     keyCode = null;
+
+    if (self.jumping) {
+      
+    }
   };
-
-  return self;
-}
-
-function Frog(textureUrl, meshId, options) {
-  var self = dali.Entity(options);
-  // var mat = dali.graphx.Material({
-  //   ambient: [0.1, 0.1, 0.1],
-  //   diffuse: [0.2, 0.7, 0.3],
-  //   specular: [0.3, 0.3, 0.3],
-  //   alpha: 1.0,
-  //   shininess: 9.0,
-  // });
-
-  var mat = frogMaterial;
-  // var texture = dali.graphx.g3D.Texture({
-  //   url: textureUrl
-  // });
-  var texture = defaultMaterial;
-  var model = dali.graphx.g3D.Model({
-    meshId: meshId,
-    eTransform: self.transform,
-  });
-
-  var renderer = dali.graphx.g3D.Renderable3D({
-    'material': mat,
-    'texture': texture,
-    'model': model
-  });
-
-  self.addRenderable(renderer);
 
   return self;
 }
@@ -288,13 +409,13 @@ function Generator(generate, timeLow, timeHigh, options) {
 
   ground.snap(self.transform.getPosition());
 
-  var elapsed = timeLow;
+  var elapsed = timeHigh;
   self.update = function(dt) {
     elapsed += dt;
 
     // TODO get better random number generator
     if (elapsed > timeLow && Math.random() < ((elapsed - timeLow) / (timeHigh - timeLow))) { // lerp likelihood
-      console.log('elapsed: ' + elapsed);
+      // console.log('elapsed: ' + elapsed);
       elapsed = 0.0;
       generate(self.transform);
     }
@@ -384,7 +505,29 @@ function Car(axis, meshId, _speed, options) {
   return self;
 }
 
+var resources = {
+  img: [
+    'img/asphalt_texture407.jpg',
+    'img/grass-textures.jpg',
+    'img/water.jpg',
+    'img/fire.jpg',
+    // 'http://brix4dayz.github.io/img/profile.png', // CORS test
+    // 'img/HandleTex.png',
+    // 'img/w3.jpg'
+  ],
+  text: [
+    // 'meta/test.json',
+    'meta/DoubleDamageFrog.obj',
+    'meta/Lincoln.obj',
+    'meta/tree.obj',
+    // src: https://www.models-resource.com/pc_computer/roblox/model/12873/
+  ]
+};
 
+var defaultPhysicsMaterial = dali.physx.PMaterial();
+
+// MAIN
+// ----------------------------------------------------------------
 function main() {
 
   var prev, current, dt;
@@ -398,11 +541,15 @@ function main() {
     requestAnimationFrame(loop);
     // TODO apart of Time/Timeline
     
+
     if (!dali.pause) {
       current = performance.now();
       dt = current - prev;
       prev = current;
+      dali.physx.update(dt / 2000);
       scene.update(dt / 1000);
+      dali.physx.update(dt / 2000);
+      // console.log(dt);
     }
     
     scene.requestRender();
@@ -422,30 +569,24 @@ function main() {
     }   
   });
 
-  var resources = {
-    img: [
-      'img/asphalt_texture407.jpg',
-      'img/grass-textures.jpg',
-      'img/water.jpg',
-      'img/fire.jpg',
-      // 'http://brix4dayz.github.io/img/profile.png', // CORS test
-      'img/HandleTex.png',
-      'img/w3.jpg'
-    ],
-    text: [
-      'meta/test.json',
-      'meta/DoubleDamageFrog.obj',
-      'meta/Lincoln.obj',
-      'meta/tree.obj',
-      // src: https://www.models-resource.com/pc_computer/roblox/model/12873/
-    ]
-  };
-
   dali.SceneManager.addScene(dali.Scene());
   var scene = dali.SceneManager.next();
 
   // loads WebGL
   dali.graphx.load();
+
+  // init's Cannon world
+  dali.physx.init();
+  dali.physx.setGravity({
+    x: 0.0, y: GRAVITY, z:0
+  });
+  dali.physx.defineMaterialContact(defaultPhysicsMaterial, defaultPhysicsMaterial, {
+    friction: 1000.0, restitution: 0.0
+  });
+  dali.physx.defineGroundContact(defaultPhysicsMaterial, {
+    friction: 1000.0, restitution: 0.0
+  });
+  dali.physx.setGroundHeight(GROUND_HEIGHT);
 
   var shader = dali.graphx.g3D.ShaderProgram3D({
     default: true,
@@ -524,13 +665,13 @@ function main() {
       dali.graphx.init();
 
       // AABBs
-      boxMesh.initAABB();
-      frogMesh.initAABB();
-      carMesh.initAABB();
+      // boxMesh.initAABB();
+      // frogMesh.initAABB();
+      // carMesh.initAABB();
 
       // GROUND
       ground = GroundGrid(
-        { x: 4.4, y: 4.4, z: 4.4},
+        { x: 4.4, y: 0.0, z: 4.4},
         0.4,
         [0.0, 0.0, 0.0],
         [
@@ -749,31 +890,31 @@ function main() {
       vec3.cross(up, at, right);
       vec3.normalize(up, up);
 
-      var player = Player({
-        transform: {
-          options: {
-            position: {
-              x: 0.0, y: 0.0, z: -2.0,
-            },
-            scale: {
-              x: 1.0, y: 1.0, z: 1.0
-            },
-          }
-        }
-      });
-      scene.addEntity(player);
+      // var player = Player({
+      //   transform: {
+      //     options: {
+      //       position: {
+      //         x: 0.0, y: 0.0, z: -2.0,
+      //       },
+      //       scale: {
+      //         x: 1.0, y: 1.0, z: 1.0
+      //       },
+      //     }
+      //   }
+      // });
+      // scene.addEntity(player);
 
       var frog = Frog('img/HandleTex.png', frogMesh.dGUID, {
         transform: {
           options: {
             position: {
-              x: 0.0, y: 0.0, z: 0,
+              x: 0.0, y: 0.1, z: -2.0,
             },
             scale: {
               x: 0.2, y: 0.2, z: 0.2
             },
           },
-          parent: player.transform
+          // parent: player.transform
         }
       });
       scene.addEntity(frog);
@@ -783,7 +924,10 @@ function main() {
       var cameraFollow = dali.graphx.g3D.PerspectiveCamera({
         transform: {
           options: {
-            position: cameraPosition
+            position: cameraPosition,
+            // scale: {
+            //   x: 5.0, y: 5.0, z: 5.0,
+            // }
           },
           parent: frog.transform
         },
@@ -839,6 +983,9 @@ function main() {
       });
 
       init();
+      setTimeout(function() {
+        frog.enabled = true;
+      }, 1600);
   }).catch(function (err) {
     console.error(err);
   });

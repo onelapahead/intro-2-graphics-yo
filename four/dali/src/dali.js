@@ -294,8 +294,12 @@ dali.EntityTransform = function (options, base, parent) {
   var position = null, rotation = null, scale = null;
 
   self.setPosition = function(_position) {
-    if (_position == null) _position = {};
-    position = new CANNON.Vec3(_position.x || 0.0, _position.y || 0.0, _position.z || 0.0);
+    if (_position == null) _position = { x: 0.0, y: 0.0, z: 0.0 };
+
+    if (position == null)
+      position = new CANNON.Vec3(_position.x, _position.y, _position.z);
+    else
+      position.copy(_position);
 
     position.vec3 = function() {
       return vec3.fromValues(position.x,position.y,position.z);
@@ -307,8 +311,12 @@ dali.EntityTransform = function (options, base, parent) {
   };
 
   self.setScale = function(_scale) {
-    if (_scale == null) _scale = {};
-    scale = new CANNON.Vec3(_scale.x || 1.0, _scale.y || 1.0, _scale.z || 1.0);
+    if (_scale == null) _scale = { x: 1.0, y: 1.0, z: 1.0};
+
+    if (scale == null)
+      scale = new CANNON.Vec3(_scale.x, _scale.y, _scale.z);
+    else
+      scale.copy(_scale);
 
     scale.vec3 = function() {
       return vec3.fromValues(scale.x,scale.y,scale.z);
@@ -354,6 +362,20 @@ dali.EntityTransform = function (options, base, parent) {
   self.setRotationFromQuat = function(_quat) {
     _quat = _quat || quat.fromValues(0.0, 0.0, 0.0, 1.0);
     rotation = new CANNON.Quaternion(_quat[0], _quat[1], _quat[2], _quat[3]);
+    rotation.quat = function() {
+      return quat.fromValues(rotation.x, rotation.y, rotation.z, rotation.w);
+    };
+  };
+
+  self.setRotation = function(rot) {
+    if (rot == null) rot = { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+
+    if (rotation == null) {
+      rotation = new CANNON.Quaternion(rot.x, rot.y, rot.z, rot.w);
+    } else {
+      rotation.copy(rot);
+    }
+
     rotation.quat = function() {
       return quat.fromValues(rotation.x, rotation.y, rotation.z, rotation.w);
     };
