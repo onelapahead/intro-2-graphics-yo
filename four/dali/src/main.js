@@ -266,8 +266,8 @@ function GroundTile(textureUrl, meshId, options) {
 
 const GRAVITY = -15.0;
 const GROUND_HEIGHT = -0.1;
-const JUMP_TIME = 1.2;
-const JUMP_HEIGHT = 1.5;
+const JUMP_TIME = 0.48;
+const JUMP_HEIGHT = 0.6;
 
 function Frog(textureUrl, meshId, options) {
   var self = dali.Entity(options);
@@ -298,12 +298,16 @@ function Frog(textureUrl, meshId, options) {
     mass: 1,
     model: model,
     collider: collider,
+    linDamp: 0.1,
   });
 
   var pos = self.transform.getPosition();
   ground.snap(pos);
   var pair = ground.quantize(pos.x, pos.z);
-  var i = pair[0], j = pair[1];
+  var coord = {
+    i: pair[0],
+    j: pair[1]
+  };
   delete pair;
   pos = null;
   delete pos;
@@ -324,35 +328,59 @@ function Frog(textureUrl, meshId, options) {
   function updateIJ() {
     var position = self.transform.getPosition();
     var pair = ground.quantize(position.x, position.z);
-    i = pair[0], j = pair[1];
+    coord.i = pair[0], coord.j = pair[1];
     position = null;
     delete position;
     delete pair;
   }
 
   function updatePosition() {
-    console.log('i: ' + i + ', j: ' + j);
-    var coords = ground.localize(i, j);
+    console.log('i: ' + coord.i + ', j: ' + coord.j);
+    var pair = ground.localize(coord.i, coord.j);
     var position = self.transform.getPosition();
-    position.x = coords[0];
-    position.z = coords[2];
+    position.x = pair[0];
+    position.z = pair[2];
     position = null;
     delete position;
-    delete coords;
+    delete pair;
   }
 
   for (var ki = 0; ki < keys.length; ki++) {
     keyMap.set(keys[ki], false);
   }
 
-  var keyCode;
+  var keyCode, timeAtJump;
   function handlePressDown(code) {
     if (!self.jumping) {
+      var axis, next;
+
+      if (code == 'KeyW' && coord.j < groundMax.j - 1) {
+        axis = 'z';
+        next = 1;
+      } else if (code == 'KeyA' && coord.i > 0) {
+        axis = 'x';
+        next = -1;
+      } else if (code == 'KeyS' && coord.j > 0) {
+        axis = 'z';
+        next = -1;
+      } else if (code == 'KeyD' && coord.i < groundMax.i - 1) {
+        axis = 'x';
+        next = 1;
+      } else return ;
+
+      if (axis != null && next != null) {
+        var jumpImpulse = jump(axis, next);
+        var entityPos = self.transform.getPosition();
+        entityPos.y += 0.01;
+        body.transform.applyImpulse(jumpImpulse, entityPos);
+        self.jumping = true;
+        timeAtJump = performance.now();
+      }
 
     }
 
-    console.log('JUMP');
-    body.transform.applyImpulse(new CANNON.Vec3(0, 3, 12), self.transform.getPosition());
+    // console.log('JUMP');
+    // body.transform.applyImpulse(new CANNON.Vec3(0, 3, 12), self.transform.getPosition());
 
     // if (code == 'KeyW' && j < groundMax.j - 1) {
     //   j += 1;
@@ -366,7 +394,36 @@ function Frog(textureUrl, meshId, options) {
     // updatePosition();
   }
 
-  function jump(axis, nextSqaure, )
+  const JUMP_Y = 2 * (JUMP_HEIGHT / JUMP_TIME) - (GRAVITY * JUMP_TIME * JUMP_TIME / 4);
+  function jump(axis, next) {
+    var impulse = new CANNON.Vec3();
+
+    var coordAxis = (axis === 'x') ? 'i' : 'j';
+    
+    var nextCoord = {
+      i: coord.i,
+      j: coord.j,
+    };
+    nextCoord[coordAxis] += next;
+
+    // console.log(coord);
+    // console.log(nextCoord);
+
+    var nextPos = ground.localize(nextCoord.i, nextCoord.j);
+    nextPos = new CANNON.Vec3(nextPos[0], nextPos[1], nextPos[2]);
+    var pos = self.transform.getPosition();
+
+    // console.log(nextPos);
+    // console.log(pos);
+
+    var dx = nextPos[axis] - pos[axis];
+    // if (dx < 0) dx -= 0.1;
+    // if (dx > 0) dx += 0.1;
+    impulse[axis] = dx / JUMP_TIME;
+    impulse.y = JUMP_Y;
+    // console.log(impulse);
+    return impulse;
+  }
 
   // body.transform.addEventListener('collide', function(event) {
   //   if (!event.body.collisionResponse || !event.target.body.collisionResponse)
@@ -395,8 +452,11 @@ function Frog(textureUrl, meshId, options) {
     }
     keyCode = null;
 
-    if (self.jumping) {
-      
+    updateIJ();
+
+    if (self.jumping && (performance.now() - timeAtJump) / 1000 >= JUMP_TIME) {
+      // console.log(body.transform.velocity);
+      self.jumping = false;
     }
   };
 
@@ -581,10 +641,10 @@ function main() {
     x: 0.0, y: GRAVITY, z:0
   });
   dali.physx.defineMaterialContact(defaultPhysicsMaterial, defaultPhysicsMaterial, {
-    friction: 1000.0, restitution: 0.0
+    friction: 1.0, restitution: 0.0
   });
   dali.physx.defineGroundContact(defaultPhysicsMaterial, {
-    friction: 1000.0, restitution: 0.0
+    friction: 0.1, restitution: 0.0
   });
   dali.physx.setGroundHeight(GROUND_HEIGHT);
 
