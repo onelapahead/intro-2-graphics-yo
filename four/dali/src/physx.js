@@ -115,9 +115,9 @@
       shape = options.shape;
     } else throw 'No shape information given for EntityBody';
 
-    if (options.print) {
-      console.log(shape);
-    }
+    // if (options.print) {
+    //   console.log(shape);
+    // }
 
     // var pos = entity.transform.getPosition();
     // pos.x = aabb.center[0];
@@ -167,6 +167,7 @@
       fixedRotation: true
     });
     self.transform.linearDamping = 0.01;
+    self.transform.entity = entity;
     world.addBody(self.transform);
 
     self.getEntityTransform = function() {
@@ -190,10 +191,6 @@
     entity.addUpdatable(self);
 
     return self;
-  };
-
-  physx.RigidBody = function () {
-    // TODO
   };
 
   physx.Collider = function() {

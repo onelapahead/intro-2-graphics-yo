@@ -32,7 +32,6 @@
     self.setType('resourcemanager');
 
     var _resources = window.dali.ObjectManager('resource');
-    var plaintexts = new Map();
     var promises = [];
 
     self.addResource = function(resource) {
@@ -62,7 +61,10 @@
 
     if (_url == null || !window.dali.isString(_url))
       throw 'Invalid resource URL: ' + _url;
-    self.dGUID = _url;
+    // TODO fix hack
+    base.index = base.index != null ? base.index : '';
+    self.dGUID = _url + base.index;
+    console.log(self.dGUID);
 
     var manager = _manager;
     if (manager == null || !window.dali.isDaliObj(manager) || !manager.isType('resourcemanager'))
@@ -99,6 +101,34 @@
     self.getImg = function() { return img; };
 
     return self;
+  };
+
+  resources.Sound = function(url, base) {
+    base = base || {};
+    var aud;
+
+    base.createPromise = function(manager) {
+      return new Promise(function(resolve, reject) {
+        aud = new Audio();
+        aud.crossOrigin = 'Anonymous';
+        aud.addEventListener('loadeddata', function() {
+
+          manager.addResource(base);
+          resolve();
+        }, true);
+
+        aud.onerror = function(err) {
+          reject({ status: "Failed to load img: " + url, error: err });
+        };
+
+        aud.src = url;
+        aud.load();
+      });
+    };
+    var self = resources.Resource(url, base);
+    self.setType('audio');
+
+    self.getAudio = function() { return aud; };
   };
 
   resources.PlainText = function(url, base) {
@@ -151,6 +181,21 @@
       if (options.text != null && window.dali.isArray(options.text)) {
         for (var i = 0; i < options.text.length; i++) {
           resources.PlainText(options.text[i]);
+        }
+      }
+
+
+      if (options.audio != null && window.dali.isArray(options.audio)) {
+        for (var i = 0; i < options.audio.length; i++) {
+          if (!window.dali.isString(options.audio[i])) {
+            var cache = options.audio[i].cache;
+            var url = options.audio[i].url;
+            for (var j = 0; j < cache; j++) {
+              resources.Sound(url, {index: j});
+            }
+          } else {
+            resources.Sound(options.audio[i]);
+          }
         }
       }
     }

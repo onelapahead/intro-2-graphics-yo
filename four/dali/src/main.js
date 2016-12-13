@@ -93,7 +93,7 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
    * TODO add box colliders for sections
    */
   var section = sections[0];
-  var secPtr = 0, texture;
+  var secPtr = 0, texture, type;
   for (var i = 0; i <= numX; i++) {
     tiles.push([]);
     secPtr = 0;
@@ -102,10 +102,13 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
       if (j === section.zBound && secPtr < sections.length) {
         section = sections[secPtr++];
       }
-      if (secPtr == sections.length && i % 2 == 1)
+      if (secPtr == sections.length && i % 2 == 1) {
         texture = section.texture1;
-      else
+        type = section.type1;
+      } else {
         texture = section.texture;
+        type = section.type;
+      }
 
       tiles[i].push(GroundTile(texture, boxMeshId, {
         transform: { 
@@ -122,6 +125,7 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
             }
           }
         },
+        groundType: type,
       }));
     }
   }
@@ -147,6 +151,8 @@ function GroundGrid(dimensions, step, center, _sections, boxMeshId) {
 
 function GroundTile(textureUrl, meshId, options) {
   var self = dali.Entity(options);
+  self.setType('groundtile');
+  self.setType(options.groundType);
 
   var texture = dali.graphx.g3D.Texture({
       url: textureUrl
@@ -184,14 +190,13 @@ const GRAVITY = -15.0;
 const GROUND_HEIGHT = -0.1;
 const JUMP_TIME = 0.5;
 const JUMP_HEIGHT = 0.7;
+const NUM_JUMP_SOUNDS = 4;
 
-function Frog(textureUrl, meshId, options) {
+function Frog(meshId, options) {
   var self = dali.Entity(options);
+  self.setType('frog');
 
   var mat = frogMaterial;
-  // var texture = dali.graphx.g3D.Texture({
-  //   url: textureUrl
-  // });
   var texture = defaultMaterial;
   var model = dali.graphx.g3D.Model({
     meshId: meshId,
@@ -226,6 +231,8 @@ function Frog(textureUrl, meshId, options) {
     i: pair[0],
     j: pair[1]
   };
+  var initPos = new CANNON.Vec3();
+  initPos.copy(self.transform.getPosition());
   delete pair;
   pos = null;
   delete pos;
@@ -299,24 +306,14 @@ function Frog(textureUrl, meshId, options) {
       }
 
     }
-
-    // console.log('JUMP');
-    // body.transform.applyImpulse(new CANNON.Vec3(0, 3, 12), self.transform.getPosition());
-
-    // if (code == 'KeyW' && j < groundMax.j - 1) {
-    //   j += 1;
-    // } else if (code == 'KeyA' && i > 0) {
-    //   i -= 1;
-    // } else if (code == 'KeyS' && j > 0) {
-    //   j -= 1;
-    // } else if (code == 'KeyD' && i < groundMax.i - 1) {
-    //   i += 1;
-    // } else return ;
-    // updatePosition();
   }
 
+  var jumpSoundPtr = 0;
   const JUMP_Y = 2 * (JUMP_HEIGHT / JUMP_TIME) - (GRAVITY * JUMP_TIME * JUMP_TIME / 4);
   function jump(axis, next) {
+    var clip = dali.resources.ResourceManager.main.getResource(HOST_DIRECTORY + 'FrogJump.mp3' + jumpSoundPtr);
+    jumpSoundPtr = (jumpSoundPtr+1) % NUM_JUMP_SOUNDS;
+    clip.getAudio().play();
     var impulse = new CANNON.Vec3();
 
     var coordAxis = (axis === 'x') ? 'i' : 'j';
@@ -346,11 +343,46 @@ function Frog(textureUrl, meshId, options) {
     return impulse;
   }
 
-  // body.transform.addEventListener('collide', function(event) {
-  //   if (!event.body.collisionResponse || !event.target.body.collisionResponse)
-  //     console.log(event);
-  //   console.log('Hitting stuff!');
-  // });
+  var dead = false, won = false;
+  body.transform.addEventListener('collide', function(event) {
+    if (event.body != null && event.target != null && event.body.entity != null && event.target.entity != null) {
+
+      var targetType = event.target.entity.getType();
+      var bodyType = event.body.entity.getType();
+      
+      console.log('Body: ' + bodyType);
+      console.log('Target: ' + targetType);
+
+      if (targetType === 'frog' && !transitioning) {
+
+        if (bodyType === 'car') {
+          dali.resources.ResourceManager.main
+            .getResource(HOST_DIRECTORY + 'CarDeath.mp3')
+            .getAudio().play();
+        } else if (bodyType === 'water') {
+          dali.resources.ResourceManager.main
+            .getResource(HOST_DIRECTORY + 'WaterDeathNoice.mp3')
+            .getAudio().play();
+        } else if (bodyType === 'fire') {
+          dali.resources.ResourceManager.main
+            .getResource(HOST_DIRECTORY + 'FireCracking.mp3')
+            .getAudio().play();
+        } else if (bodyType === 'win') {
+          dali.resources.ResourceManager.main
+            .getResource(HOST_DIRECTORY + 'WinSound.mp3')
+            .getAudio().play();
+        }
+
+        if (bodyType === 'car' || bodyType === 'fire' || bodyType ==='water') {
+          dead = true;
+        } else if (bodyType === 'win') {
+          won = true;
+        }
+
+
+      }
+    }
+  });
 
   self.addEventListener('keydown', function(event) {
     if (keyMap.has(event.code) && !keyMap.get(event.code)) {
@@ -367,6 +399,7 @@ function Frog(textureUrl, meshId, options) {
     }
   });
 
+  var bounds = ground.getWorldBounds();
   self.update = function(dt) {
     if (keyCode != null && self.enabled) {
       handlePressDown(keyCode);
@@ -378,10 +411,60 @@ function Frog(textureUrl, meshId, options) {
     if (self.jumping && (performance.now() - timeAtJump) / 1000 >= JUMP_TIME) {
       // console.log(body.transform.velocity);
       self.jumping = false;
-      updateIJ();
+      // updateIJ();
       updatePosition();
     }
+
+    var pos = self.transform.getPosition();
+    if (pos.x < bounds.min.x || pos.x > bounds.max.x || pos.z > bounds.max.z || pos.z < bounds.min.z)
+      die();
+
+    if (dead) {
+      die();
+      dead = false;
+    }
+
+    if (won) {
+      win();
+      won = false;
+    }
   };
+
+  self.reset = function() {
+    transitioning = false;
+  };
+
+  var transitioning = false;
+  var deaths = 0, points = 0;
+  var scoreboard = document.getElementById('scoreboard');
+  function die() {
+    self.transform.setPosition(initPos);
+    updateIJ();
+    dali.pause = true;
+    body.transform.velocity = new CANNON.Vec3();
+    deaths++;
+    makeScoreboardText();
+    transitioning = true;
+    alert('You died! Press ESC to unpause.');
+  };
+
+  function win() {
+    self.transform.setPosition(initPos);
+    updateIJ();
+    dali.pause = true;
+    body.transform.velocity = new CANNON.Vec3();
+    points++;
+    makeScoreboardText();
+    transitioning = true;
+    alert('You won! Press ESC to unpause');
+  }
+
+  function makeScoreboardText() {
+    scoreboard.innerHTML = `
+      <p>Deaths: ${deaths}     Wins: ${points}</p>
+    `;
+  }
+  makeScoreboardText();
 
   return self;
 }
@@ -517,24 +600,47 @@ function Car(axis, meshId, _speed, options) {
   return self;
 }
 
+const HOST_DIRECTORY = "http://brix4dayz.github.io/img/frogger/";
 var resources = {
   img: [
-    'img/asphalt_texture407.jpg',
-    'img/grass-textures.jpg',
-    'img/water.jpg',
-    'img/fire.jpg',
+    'asphalt_texture407.jpg',
+    'grass-textures.jpg',
+    'water.jpg',
+    'fire.jpg',
     // 'http://brix4dayz.github.io/img/profile.png', // CORS test
     // 'img/HandleTex.png',
     // 'img/w3.jpg'
   ],
   text: [
     // 'meta/test.json',
-    'meta/DoubleDamageFrog.obj',
-    'meta/Lincoln.obj',
-    'meta/tree.obj',
+    'DoubleDamageFrog.obj',
+    'Lincoln.obj',
+    'tree.obj',
     // src: https://www.models-resource.com/pc_computer/roblox/model/12873/
-  ]
+  ],
+  audio: [
+    { cache: NUM_JUMP_SOUNDS, url: 'FrogJump.mp3'},
+    'CarDeath.mp3',
+    'WaterDeathNoice.mp3',
+    'FireCracking.mp3',
+    'WinSound.mp3',
+  ],
 };
+
+for (var i = 0; i < resources.img.length; i++) {
+  resources.img[i] = HOST_DIRECTORY + resources.img[i];
+}
+
+for (var i = 0; i < resources.text.length; i++) {
+  resources.text[i] = HOST_DIRECTORY + resources.text[i];
+}
+
+for (var i = 0; i < resources.audio.length; i++) {
+  if (dali.isString(resources.audio[i]))
+    resources.audio[i] = HOST_DIRECTORY + resources.audio[i];
+  else
+    resources.audio[i].url = HOST_DIRECTORY + resources.audio[i].url;
+}
 
 var defaultPhysicsMaterial = dali.physx.PMaterial();
 
@@ -568,22 +674,10 @@ function main() {
     dali.graphx.render();
   }
 
-  // ESC to pause
-
-  dali.SceneManager.addEventListener('keydown', function(keyEvent) {
-    if (keyEvent.code === 'Escape') {
-      if (!dali.pause) {
-        dali.pause = true;
-      } else {
-        prev = performance.now();
-        dali.pause = false;
-      }
-    }   
-  });
-
   dali.SceneManager.addScene(dali.Scene());
   var scene = dali.SceneManager.next();
 
+  window.dali.canvas = window.dali.canvas || document.getElementById('glCanvas');
   // loads WebGL
   dali.graphx.load();
 
@@ -647,7 +741,7 @@ function main() {
     .then(function() {
 
       var frogMesh = dali.graphx.g3D.TriMesh({
-        url: 'meta/DoubleDamageFrog.obj'
+        url: HOST_DIRECTORY + 'DoubleDamageFrog.obj'
       });
       shader.addMesh(frogMesh);
 
@@ -664,12 +758,12 @@ function main() {
       shader.addMesh(boxMesh);
 
       var carMesh = dali.graphx.g3D.TriMesh({
-        url: 'meta/Lincoln.obj'
+        url: HOST_DIRECTORY + 'Lincoln.obj'
       });
       shader.addMesh(carMesh);
 
       var logMesh = dali.graphx.g3D.TriMesh({
-        url: 'meta/tree.obj'
+        url: HOST_DIRECTORY + 'tree.obj'
       });
       shader.addMesh(logMesh);
 
@@ -687,11 +781,11 @@ function main() {
         0.4,
         [0.0, 0.0, 0.0],
         [
-          { zBound: 1, texture: 'img/grass-textures.jpg'},
-          { zBound: 5, texture: 'img/asphalt_texture407.jpg'},
-          { zBound: 6, texture: 'img/grass-textures.jpg' },
-          { zBound: 10, texture: 'img/water.jpg' },
-          { zBound: 11, texture: 'img/fire.jpg', texture1: 'img/grass-textures.jpg' },
+          { zBound: 1, type: 'grass', texture: HOST_DIRECTORY + 'grass-textures.jpg'},
+          { zBound: 5, type: 'asphalt', texture: HOST_DIRECTORY + 'asphalt_texture407.jpg'},
+          { zBound: 6, type: 'grass', texture: HOST_DIRECTORY + 'grass-textures.jpg' },
+          { zBound: 10, type: 'water', texture: HOST_DIRECTORY + 'water.jpg' },
+          { zBound: 11, type: 'fire', texture: HOST_DIRECTORY + 'fire.jpg', type1: 'win', texture1: HOST_DIRECTORY + 'grass-textures.jpg' },
         ],
         boxMesh.dGUID
       );
@@ -917,7 +1011,7 @@ function main() {
       // });
       // scene.addEntity(player);
 
-      var frog = Frog('img/HandleTex.png', frogMesh.dGUID, {
+      var frog = Frog(frogMesh.dGUID, {
         transform: {
           options: {
             position: {
@@ -931,6 +1025,20 @@ function main() {
         }
       });
       scene.addEntity(frog);
+
+      // ESC to pause
+
+      dali.SceneManager.addEventListener('keydown', function(keyEvent) {
+        if (keyEvent.code === 'Escape') {
+          if (!dali.pause) {
+            dali.pause = true;
+          } else {
+            frog.reset();
+            prev = performance.now();
+            dali.pause = false;
+          }
+        }   
+      });
 
       // CAMERAS
 
