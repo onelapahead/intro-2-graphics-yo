@@ -260,7 +260,7 @@ function Frog(meshId, options) {
   }
 
   function updatePosition() {
-    console.log('i: ' + coord.i + ', j: ' + coord.j);
+    // console.log('i: ' + coord.i + ', j: ' + coord.j);
     var pair = ground.localize(coord.i, coord.j);
     var position = self.transform.getPosition();
     position.x = pair[0];
@@ -350,8 +350,8 @@ function Frog(meshId, options) {
       var targetType = event.target.entity.getType();
       var bodyType = event.body.entity.getType();
       
-      console.log('Body: ' + bodyType);
-      console.log('Target: ' + targetType);
+      // console.log('Body: ' + bodyType);
+      // console.log('Target: ' + targetType);
 
       if (targetType === 'frog' && !transitioning) {
 
@@ -677,6 +677,7 @@ function main() {
   dali.SceneManager.addScene(dali.Scene());
   var scene = dali.SceneManager.next();
 
+  // TODO fix canvas hack
   window.dali.canvas = window.dali.canvas || document.getElementById('glCanvas');
   // loads WebGL
   dali.graphx.load();

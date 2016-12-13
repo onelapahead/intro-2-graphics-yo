@@ -4,19 +4,42 @@
     <meta charset="UTF-8">
     <title>Frogger3D</title>
     
+    <!-- Bootstrap: Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
     <script type="text/javascript" src="../dali/dali.min.js"></script>
   </head>
 
   <body onload="main();">
-    <div style="display: block; margin: auto; text-align: center;">
-      <br />
-      <h3>Frogger3D</h3>
-      <br />
-      <div id='scoreboard'>
-
+    <div class="row">
+      <div class="col-lg-12" style="display: block; margin: auto; text-align: center;">
+        <h3>Frogger3D</h3>
+        <br />
+        <div id='scoreboard'>
+        </div>
       </div>
-      <br />
-      <canvas id="glCanvas" width="512" height="512" style="display: block; margin: auto;"></canvas>
+    </div>
+    <br />
+    <div class="row">
+      <div class="col-lg-12">
+        <canvas id="glCanvas" width="512" height="512" style="display: block; margin: auto;"></canvas>
+      </div>
+    </div>
+    <br /><br />
+    <div class="row" style="display: block; margin: auto; text-align: center;">
+      <div class="col-lg-4">
+        Press ESC to pause/unpause.
+      </div>
+      <div class="col-lg-4">
+        Use WASD to move the frog.
+      </div>
+      <div class="col-lg-4">
+        Hold Space to see the classic top-down view.
+      </div>
+      <br /><br />
+      <div class="col-lg-12" style="color: red;">
+        NOTE: Initially, the frog will be disabled to prevent a player from crossing the road while there are no cars.
+      </div>
     </div>
   </body>
 </html>
